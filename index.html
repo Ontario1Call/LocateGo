@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LocateGo Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Roboto+Condensed:wght@700&display=swap" rel="stylesheet">
+<style>
+/*
+VOICE: a working field app, plain and fast; the prototype chrome stays quiet around it
+IDEA: an Android phone on the desk running a ride-hail style dispatch app for locators
+PICTURE: the phone, live, with a Google-style vector map of the GTA as its main surface
+COLOUR and TYPE: white app, navy ink #0F1B2D, safety orange #FF6B00, Google map palette; Roboto
+LAYOUT: desktop = brief on the left, phone on the right; phone width = the app fills the screen
+*/
+:root{color-scheme:light dark;--bg:light-dark(#e6eaf0,#0b121c);--ink:light-dark(#0F1B2D,#e8edf4);--muted:light-dark(#5B6675,#9aa8ba);
+--o:#FF6B00;--n:#0F1B2D;--g:#5B6675;--p:#F3F5F8;--line:#DDE2E9;--red:#D42B2B;--green:#1F9D55;--blue:#1565D8;--gblue:#4285F4}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 Roboto,system-ui,sans-serif;overflow-x:clip}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;-webkit-tap-highlight-color:transparent}
+button:focus-visible,input:focus-visible,textarea:focus-visible,.knob:focus-visible{outline:3px solid var(--o);outline-offset:2px}
+.stage{min-height:100dvh;display:grid;grid-template-columns:minmax(0,360px) auto;gap:48px;justify-content:center;align-items:center;padding:28px}
+.brief h1{font:700 40px/1.05 "Roboto Condensed",Roboto,sans-serif;margin:0 0 10px;text-wrap:balance}
+.brief p{margin:0 0 14px;color:var(--muted)}
+.brief ol{margin:0 0 16px;padding-left:20px}.brief li{margin:5px 0}
+.brief .row{display:flex;gap:8px;flex-wrap:wrap}
+.chipbtn{min-height:44px;padding:0 16px;border-radius:10px;border:1.5px solid color-mix(in srgb,var(--ink) 25%,transparent);font-weight:600}
+.chipbtn.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chipbtn.fb{background:var(--o);border-color:var(--o);color:#fff}
+.small{font-size:13px;color:var(--muted)}
+.phone{width:390px;height:min(820px,calc(100dvh - 56px));border-radius:46px;background:#111;padding:12px;box-shadow:0 30px 60px -20px #0007}
+.screen{position:relative;height:100%;border-radius:36px;overflow:hidden;background:#fff;color:var(--n);color-scheme:light}
+.mbar{display:none}
+@media(max-width:820px){
+  .stage{display:block;padding:0}.brief{display:none}
+  .phone{width:100%;height:calc(100dvh - 48px);border-radius:0;padding:0;box-shadow:none;background:none}
+  .screen{border-radius:0}
+  .mbar{display:flex;gap:8px;align-items:center;height:48px;padding:0 8px;background:#0F1B2D;color:#fff}
+  .mbar .t{font-weight:700;flex:1;font-size:14px}
+  .mbar button{min-height:36px;padding:0 11px;border-radius:8px;border:1px solid #ffffff40;font-size:13.5px;font-weight:600;color:#fff}
+  .mbar .fbm{background:var(--o);border-color:var(--o)}
+}
+/* ---------- app ---------- */
+#app{position:absolute;inset:0;display:flex;flex-direction:column;font-size:15px}
+.hdr{display:flex;align-items:center;gap:6px;padding:10px 10px 9px;border-bottom:1px solid var(--line);background:#fff;z-index:2}
+.hdr h2{margin:0;font-size:19px;font-weight:700;flex:1;line-height:1.15}
+.hdr h2 small{display:block;font-size:12px;color:var(--g);font-weight:500}
+.ib{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:none}
+.ib:hover{background:var(--p)}.ib svg{width:24px;height:24px}
+.body{flex:1;overflow-y:auto;padding:14px 14px 24px;-webkit-overflow-scrolling:touch}
+.foot{padding:10px 14px 14px;border-top:1px solid var(--line);background:#fff;z-index:2}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;width:100%;border-radius:12px;background:var(--o);color:#fff;font-weight:700;font-size:17px}
+.btn.alt{background:#fff;color:var(--n);border:1.5px solid #CBD2DB}
+.btn.navy{background:var(--n)}.btn.danger{background:#fff;color:var(--red);border:1.5px solid var(--red)}
+.btn.dim{background:#B8BEC7}.btn.sm{min-height:44px;font-size:15px}.btn.ghost{background:var(--p);color:var(--n)}
+.btns{display:flex;gap:10px}.btns>*{flex:1}.btns>.w3{flex:1.5}
+.helper{font-size:12.5px;color:var(--g);text-align:center;margin-top:6px}
+.sec{font-weight:700;font-size:17px;margin:20px 0 8px}
+.muted{color:var(--g)}
+.card{border:1px solid var(--line);border-radius:14px;padding:12px 13px;background:#fff;text-align:left;width:100%;display:block;margin-bottom:10px}
+.card:active{background:var(--p)}
+.card .tn{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--g);font-weight:600}
+.card .tn span:first-child{flex:1}
+.card .ad{font-size:17px;font-weight:700;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .sub{color:var(--g);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .due{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:13px;font-weight:600;gap:8px}
+.badge{display:inline-block;padding:3px 9px;border-radius:99px;color:#fff;font-size:11.5px;font-weight:700;white-space:nowrap}
+.emer{background:var(--red);color:#fff;border-radius:6px;padding:2px 7px;font-size:10.5px;font-weight:900;letter-spacing:.5px}
+.uchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.uchip{display:inline-flex;align-items:center;gap:5px;border:1.5px solid;border-radius:99px;padding:1px 8px;font-size:12px;font-weight:600;white-space:nowrap}
+.uchip i{width:8px;height:8px;border-radius:50%;display:block}
+.kv{display:grid;grid-template-columns:104px minmax(0,1fr);gap:5px 10px;font-size:14.5px;margin:10px 0}
+.kv dt{color:var(--g)}.kv dd{margin:0}
+.grey{background:var(--p);border-radius:10px;padding:11px 12px;font-size:14.5px}
+.mapbox{position:relative;background:#F1F3F4;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+.mapbox svg{display:block}
+.maplabel{position:absolute;left:10px;top:10px;background:#fff;border-radius:8px;padding:5px 9px;font-size:13px;font-weight:600;box-shadow:0 1px 4px #0003;z-index:2}
+.fab{position:absolute;z-index:4;width:46px;height:46px;border-radius:50%;background:#fff;box-shadow:0 2px 8px #0003;display:grid;place-items:center}
+.fab svg{width:24px;height:24px}
+.fab.on{background:#E8F0FE;color:#1A73E8}
+.fabs{position:absolute;right:12px;z-index:4;display:flex;flex-direction:column;gap:10px}
+.fabs .fab{position:static}
+/* tech home */
+.top{position:absolute;left:10px;right:10px;top:10px;z-index:5;background:#fff;border-radius:16px;box-shadow:0 4px 14px #0002;display:flex;align-items:center;gap:6px;padding:8px 4px 8px 12px;border-left:6px solid transparent}
+.top.on{border-left-color:var(--o)}
+.top .who{flex:1}.top .who b{display:block;font-size:17px}.top .who span{font-size:13px;font-weight:600}
+.sw{width:64px;height:36px;border-radius:99px;background:#C9CFD8;position:relative;flex:none;transition:background .2s}
+.sw::after{content:"";position:absolute;left:4px;top:4px;width:28px;height:28px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px #0004}
+.sw.on{background:var(--o)}.sw.on::after{left:32px}
+.pills{position:absolute;left:10px;right:10px;top:84px;z-index:4;display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.pill{flex:none;min-height:36px;padding:0 13px;border-radius:99px;background:#fff;box-shadow:0 2px 6px #0002;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+.pill.dark{background:#0F1B2D;color:#fff}.pill.on{background:#FFE6D5;color:#9a3c00}
+.panel{position:absolute;left:0;right:0;bottom:0;height:262px;background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -6px 18px #0002;z-index:5;display:flex;flex-direction:column}
+.panel .ph{display:flex;justify-content:space-between;align-items:baseline;padding:14px 16px 4px}
+.panel .ph b{font-size:18px}
+.hlist{display:flex;gap:10px;overflow-x:auto;padding:6px 14px 14px;scroll-snap-type:x mandatory}
+.hlist .card{width:280px;flex:none;margin:0;scroll-snap-align:start}
+.empty{flex:1;display:grid;place-items:center;text-align:center;color:var(--g);padding:10px 30px}
+.activebar{position:absolute;left:10px;right:10px;top:130px;z-index:5;background:var(--blue);color:#fff;border-radius:12px;padding:10px 14px;text-align:left;display:flex;align-items:center;gap:10px;width:calc(100% - 20px);box-shadow:0 4px 12px #0003}
+.activebar b{display:block}
+/* swipe to confirm */
+.swipe{position:relative;height:60px;border-radius:14px;background:var(--o);color:#fff;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none}
+.swipe .lbl{position:absolute;inset:0;display:grid;place-items:center;font-weight:700;font-size:17px;padding-left:44px}
+.swipe .knob{position:absolute;left:5px;top:5px;width:50px;height:50px;border-radius:11px;background:#fff;color:var(--o);display:grid;place-items:center;font-size:22px;font-weight:900;cursor:grab;box-shadow:0 2px 6px #0003}
+.swipe.navy{background:var(--n)}.swipe.navy .knob{color:var(--n)}
+.swipe.green{background:#188038}.swipe.green .knob{color:#188038}
+/* sheets */
+.scrim{position:absolute;inset:0;background:#0F1B2D66;z-index:10;display:flex;align-items:flex-end;animation:fade .2s}
+.sheet{background:#fff;width:100%;border-radius:24px 24px 0 0;padding:10px 18px 18px;max-height:92%;overflow-y:auto;animation:up .25s ease-out}
+.grab{width:40px;height:4px;border-radius:9px;background:#CBD2DB;margin:0 auto 12px}
+@keyframes up{from{transform:translateY(40px);opacity:.4}}@keyframes fade{from{opacity:0}}
+@keyframes ring{0%{box-shadow:0 0 0 0 #FF6B0066}100%{box-shadow:0 0 0 18px #FF6B0000}}
+@media(prefers-reduced-motion:reduce){.scrim,.sheet,.timer{animation:none!important}}
+.timer{width:58px;height:58px;flex:none;position:relative;display:grid;place-items:center;font-weight:900;font-size:19px;border-radius:50%;animation:ring 1s infinite}
+.timer svg{position:absolute;inset:0}
+.big{font-size:24px;font-weight:900;line-height:1.15;margin:2px 0}
+.ban{background:var(--red);color:#fff;text-align:center;font-weight:900;letter-spacing:1px;border-radius:10px;padding:9px;margin-bottom:10px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.facts div{background:var(--p);border-radius:10px;padding:8px 10px}
+.facts b{display:block;font-size:17px}.facts span{font-size:12px;color:var(--g)}
+textarea,input[type=text]{width:100%;font:16px Roboto,sans-serif;border:1.5px solid #CBD2DB;border-radius:10px;padding:11px 12px;color:var(--n);background:#fff}
+.toast{pointer-events:none;position:absolute;left:14px;right:14px;bottom:18px;z-index:30;background:#0F1B2D;color:#fff;border-radius:12px;padding:12px 14px;font-size:14.5px;box-shadow:0 6px 18px #0004;animation:up .2s}
+.list button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px 4px;border-bottom:1px solid var(--line);font-size:15.5px;min-height:52px}
+.list button b{display:block}.list button span{font-size:13px;color:var(--g)}
+.list .ico{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex:none;color:#fff;font-weight:900}
+.toggle{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.toggle>div{flex:1}.toggle b{display:block;font-size:15.5px}.toggle span{font-size:13px;color:var(--g)}
+/* nav */
+.navban{position:absolute;left:10px;right:10px;top:10px;z-index:5;background:#188038;color:#fff;border-radius:14px;padding:12px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 4px 14px #0003}
+.navban svg{width:40px;height:40px;flex:none}
+.navban b{display:block;font-size:20px;line-height:1.15}.navban span{font-size:14px;opacity:.9}
+.navthen{position:absolute;left:10px;top:84px;z-index:5;background:#0D652D;color:#fff;border-radius:0 0 10px 10px;padding:6px 12px;font-size:13.5px;font-weight:600}
+.navbot{position:absolute;left:0;right:0;bottom:0;z-index:5;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -6px 18px #0002;padding:14px 14px 16px}
+.eta{display:flex;align-items:baseline;gap:10px}.eta b{font-size:26px;color:#188038;white-space:nowrap}.eta span{min-width:0}.eta span{color:var(--g)}
+/* forms */
+.photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.photos .ph{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--p)}
+.photos .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.photos .x{position:absolute;right:4px;top:4px;width:30px;height:30px;border-radius:50%;background:#000a;color:#fff;font-size:16px}
+.choice{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 14px}
+.choice button{min-height:40px;padding:0 14px;border-radius:9px;border:1.5px solid #CBD2DB;font-weight:600;font-size:14px}
+.choice button.on{background:#FFE6D5;border-color:var(--o);color:#9a3c00}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tile{border-radius:14px;color:#fff;padding:12px 14px;text-align:left;min-height:84px;display:flex;flex-direction:column;justify-content:space-between}
+.tile b{font-size:30px;font-weight:900;line-height:1}.tile span{font-weight:600;font-size:13.5px}
+.tabs{display:flex;border-bottom:1px solid var(--line);background:#fff}
+.tabs button{flex:1;min-height:46px;font-weight:600;color:var(--g);border-bottom:3px solid transparent}
+.tabs button.on{color:var(--o);border-bottom-color:var(--o)}
+.seg{display:flex;background:var(--p);border-radius:10px;padding:3px;margin-right:6px}
+.seg button{min-height:34px;padding:0 12px;border-radius:8px;font-weight:600;font-size:13.5px;color:var(--g)}
+.seg button.on{background:#fff;color:var(--n);box-shadow:0 1px 3px #0002}
+.stars{display:flex;justify-content:center;gap:2px}
+.stars button{width:52px;height:52px;font-size:38px;line-height:1;color:var(--o)}
+.gallery{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.gallery img{width:170px;height:130px;object-fit:cover;border-radius:12px;flex:none}
+.techcard{position:absolute;left:10px;right:10px;bottom:12px;background:#fff;border-radius:16px;box-shadow:0 6px 18px #0003;padding:14px;z-index:5}
+.av{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:900;flex:none}
+.start{padding:26px 20px;display:flex;flex-direction:column;gap:14px;height:100%;overflow-y:auto}
+.start h1{font:700 30px/1.05 "Roboto Condensed",Roboto,sans-serif;margin:8px 0 0}
+.rolecard{border-radius:18px;padding:18px;text-align:left;color:#fff;display:flex;gap:14px;align-items:center}
+.rolecard svg{width:42px;height:42px;flex:none}
+.rolecard b{display:block;font-size:19px}.rolecard span{font-size:14px;opacity:.9}
+.fbitem{border-top:1px solid var(--line);padding:8px 0;font-size:14px}.fbitem small{color:var(--g);display:block}
+.bars{display:flex;align-items:flex-end;gap:8px;height:110px;margin-top:8px}
+.bars div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11.5px;color:var(--g)}
+.bars i{display:block;width:100%;border-radius:6px 6px 2px 2px;background:#FFC9A3}.bars .today i{background:var(--o)}
+.stat3{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.stat3 div{background:var(--p);border-radius:12px;padding:12px}.stat3 b{display:block;font-size:24px;font-weight:900}.stat3 span{font-size:13px;color:var(--g)}
+.tl{list-style:none;margin:0;padding:0}
+.tl li{display:grid;grid-template-columns:64px 18px minmax(0,1fr);gap:8px;align-items:start;padding-bottom:14px;position:relative}
+.tl li time{font-weight:700;font-size:14px;white-space:nowrap;text-align:right}
+.tl li i{width:14px;height:14px;border-radius:50%;background:var(--o);margin-top:3px;position:relative}
+.tl li:not(:last-child) i::after{content:"";position:absolute;left:6px;top:14px;width:2px;height:34px;background:#FFC9A3}
+.chat{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto;padding:4px 0 10px}
+.msg{max-width:80%;padding:9px 12px;border-radius:14px;font-size:14.5px}
+.msg.me{align-self:flex-end;background:var(--o);color:#fff;border-bottom-right-radius:4px}
+.msg.them{align-self:flex-start;background:var(--p);border-bottom-left-radius:4px}
+.qr{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.qr button{min-height:38px;padding:0 12px;border-radius:99px;border:1.5px solid #CBD2DB;font-size:13.5px;font-weight:600}
+input[type=range]{width:100%;accent-color:#FF6B00}
+.switch{width:52px;height:30px;border-radius:99px;background:#C9CFD8;position:relative;flex:none}
+.switch::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px #0004}
+.switch.on{background:var(--o)}.switch.on::after{left:25px}
+
+/* ---------- v3 additions ---------- */
+.tchip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:800;letter-spacing:.2px;white-space:nowrap;border:1.5px solid}
+.modeseg{flex:none;display:flex;background:#fff;border-radius:99px;box-shadow:0 2px 6px #0002;padding:3px}
+.modeseg button{min-height:32px;padding:0 13px;border-radius:99px;font-size:13.5px;font-weight:700;color:var(--g)}
+.modeseg button.on{background:var(--n);color:#fff}
+.stops{flex:1;overflow-y:auto;padding:0 14px 14px}
+.stop{display:flex;gap:12px;align-items:center;width:100%;text-align:left;padding:10px 0;border-bottom:1px solid var(--line)}
+.stop .n{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:900;display:grid;place-items:center;flex:none;font-size:14px}
+.stop.done .n{background:var(--green)}.stop.next .n{background:var(--o)}
+.stop b{display:block;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stop span{font-size:13px;color:var(--g)}
+.stop time{margin-left:auto;font-weight:700;font-size:14px;white-space:nowrap}
+.offbanner{background:#3C4043;color:#fff;font-size:13.5px;font-weight:600;padding:8px 12px;display:flex;gap:8px;align-items:center;z-index:6}
+.offbanner i{width:9px;height:9px;border-radius:50%;background:#F29900;display:block;flex:none}
+.comp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:4px}
+.comp div{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.comp b{display:block;font-size:22px;font-weight:900}.comp span{font-size:12.5px;color:var(--g)}
+.sync{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--g);margin:8px 0 2px}
+.sync i{width:9px;height:9px;border-radius:50%;background:var(--green);display:block}
+.chiprow{display:flex;gap:6px;overflow-x:auto;padding:10px 0 4px}
+.chiprow button{flex:none;min-height:34px;padding:0 12px;border-radius:99px;border:1.5px solid #CBD2DB;font-size:13px;font-weight:600}
+.chiprow button.on{background:var(--n);border-color:var(--n);color:#fff}
+.note{border-radius:12px;padding:10px 12px;font-size:14px;margin:8px 0}
+.note.info{background:#E8F0FE;color:#174EA6}.note.warn{background:#FEF7E0;color:#7A4F01}.note.ok{background:#E6F4EA;color:#0D652D}
+.prog{height:8px;border-radius:9px;background:var(--p);overflow:hidden;margin:8px 0 4px}.prog i{display:block;height:100%;background:var(--o)}
+.lot{width:100%;border-radius:12px;border:1px solid var(--line);background:#FAFAF7;display:block}
+.offrow{display:grid;grid-template-columns:110px minmax(0,1fr) 64px;gap:10px;align-items:center;padding:6px 0}
+.offrow b{font-size:14px}.offrow output{font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.doc{background:#fff;border:1px solid #CBD2DB;border-radius:6px;padding:14px;font-size:12.5px;box-shadow:0 2px 10px #0001}
+.doc h3{margin:0;font-size:16px}.doc .dh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--n);padding-bottom:8px;margin-bottom:8px;gap:8px}
+.doc table{width:100%;border-collapse:collapse;margin:6px 0}.doc td,.doc th{border-bottom:1px solid var(--line);padding:4px 3px;text-align:left}.doc th{color:var(--g);font-weight:600}
+.doc .sig{height:60px;border:1.5px dashed #CBD2DB;border-radius:8px;display:grid;place-items:center;color:var(--g);cursor:pointer;margin-top:4px}
+.doc .valid{background:#FFF1E6;border-radius:6px;padding:6px 8px;font-weight:700;color:#9a3c00;margin:6px 0}
+.hist{list-style:none;margin:0;padding:0;font-size:13.5px}
+.hist li{display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
+.hist time{color:var(--g);white-space:nowrap}
+.cert{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;font-size:13px;font-weight:700;margin:0 6px 6px 0}
+.cert.ok{background:#E6F4EA;color:#0D652D}.cert.no{background:var(--p);color:var(--g);text-decoration:line-through}
+/* office dashboard (desktop) */
+.office{position:fixed;inset:0;z-index:100;background:#F6F7F9;color:#0F1B2D;color-scheme:light;overflow:auto;display:flex;flex-direction:column}
+.office header{display:flex;align-items:center;gap:14px;padding:14px 24px;background:#0F1B2D;color:#fff;position:sticky;top:0;z-index:2}
+.office header h2{margin:0;font-size:19px;flex:1}
+.office header button{min-height:38px;padding:0 14px;border-radius:8px;border:1px solid #ffffff40;font-weight:600;color:#fff}
+.office .wrap{padding:18px 24px 40px;max-width:1400px;width:100%;margin:0 auto}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.kpis div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpis b{display:block;font-size:26px;font-weight:900}.kpis span{font-size:13px;color:var(--g)}
+.otools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.otools select,.otools input{font:14px Roboto,sans-serif;min-height:38px;border:1.5px solid #CBD2DB;border-radius:8px;padding:0 10px;background:#fff;color:var(--n)}
+.otable{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);font-size:13.5px}
+.otable th{background:#F1F3F4;text-align:left;padding:9px 10px;font-weight:600;color:var(--g);white-space:nowrap;position:sticky;top:66px}
+.otable td{padding:8px 10px;border-top:1px solid var(--line);white-space:nowrap}
+.otable tbody tr{cursor:pointer}.otable tbody tr:hover{background:#FFF6EF}
+.otable td.num{font-variant-numeric:tabular-nums}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.otable th{position:static}.owrapt{overflow-x:auto}}
+
+</style>
+</head>
+<body>
+<script>
+window.__lgErr=function(m){var d=document.getElementById('lg-err');if(!d){d=document.createElement('div');d.id='lg-err';d.setAttribute('role','alert');d.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:#B3261E;color:#fff;font:14px/1.4 system-ui,sans-serif;padding:12px 14px;border-radius:10px;white-space:pre-wrap;max-height:40vh;overflow:auto';(document.body||document.documentElement).appendChild(d);}d.textContent='LocateGo hit an error. Please copy this and send it to Claude:\n'+m;};
+window.addEventListener('error',function(e){__lgErr((e.message||'Script error')+' (line '+(e.lineno||'?')+')');});
+window.addEventListener('unhandledrejection',function(e){var r=e.reason;__lgErr('Promise: '+(r&&r.message?r.message:String(r)));});
+</script>
+<div class="stage">
+  <aside class="brief">
+    <h1>LocateGo clickable prototype</h1>
+    <p>Tap through the app as a locate technician or a utility reviewer. Nothing is saved to a real system, and every ticket is made up.</p>
+    <b>Try these as a technician</b>
+    <ol>
+      <li>Start your shift (you'll see the tracking policy first) and look at <b>My route</b>, the stops dispatch planned for today.</li>
+      <li>Go to stop 1, swipe to start the trip, simulate the drive, swipe to arrive. Turn on <b>Utility records</b>.</li>
+      <li>Complete it: photos and results, the <b>locate sketch</b>, then sign and send the <b>locate document</b>.</li>
+      <li>Watch for the emergency offer, try <b>Report a delay</b> from the ⋮ menu, and flip <b>Simulate no signal</b> in My work.</li>
+    </ol>
+    <b>Try these as a utility reviewer</b>
+    <ol>
+      <li>Filter by ticket type. Send records for the Design & Planning ticket, or clear one without a visit.</li>
+      <li>Answer the delay notice, check <b>Locates expiring soon</b>, and open the Dedicated Locator project.</li>
+      <li>Rate a finished locate and open its locate document.</li>
+    </ol>
+    <div class="row" style="margin-bottom:12px">
+      <button class="chipbtn" data-act="role" data-arg="tech">Technician</button>
+      <button class="chipbtn" data-act="role" data-arg="uio">Utility reviewer</button>
+      <button class="chipbtn" data-act="officeOpen">Office dashboard</button>
+    </div>
+    <div class="row">
+      <button class="chipbtn fb" data-act="fbOpen">Leave feedback on this screen</button>
+      <button class="chipbtn" data-act="reset">Start over</button>
+    </div>
+    <p class="small" style="margin-top:14px">Prototype only. Sample data for testing. Drag to pan the maps, scroll or pinch to zoom.</p>
+  </aside>
+  <div>
+    <div class="mbar">
+      <span class="t">Prototype</span>
+      <button data-act="roleSwap" id="mb-role">Switch role</button>
+      <button class="fbm" data-act="fbOpen">Feedback</button>
+    </div>
+    <div class="phone"><div class="screen"><div id="app"><div style="padding:40px 24px;font-size:16px;color:#5B6675">Loading the LocateGo prototype…</div></div></div></div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* ================= Google-style vector map (no tiles, no API key) =================
+   Toronto's street grid is tilted about 17 degrees. East-west roads rise ~0.18 deg lat per
+   deg lng; north-south roads drift ~0.265 deg west per deg lat. Roads are drawn as lines
+   through a known intersection with those slopes, which lands within ~300 m of reality. */
+const SE = 0.18, SN = 0.265;
+const ROADS_EW = [
+  {n:'Steeles Ave', a:[43.7944,-79.4466], r:[-79.66,-79.15], lv:1},
+  {n:'Finch Ave', a:[43.7804,-79.4153], r:[-79.62,-79.17], lv:1},
+  {n:'Sheppard Ave', a:[43.7615,-79.4111], r:[-79.58,-79.15], lv:1},
+  {n:'Lawrence Ave', a:[43.7251,-79.4022], r:[-79.55,-79.15], lv:1},
+  {n:'Eglinton Ave', a:[43.7066,-79.3984], r:[-79.62,-79.17], lv:1},
+  {n:'St Clair Ave', a:[43.6880,-79.3940], r:[-79.53,-79.24], lv:1},
+  {n:'Bloor St W', a:[43.6709,-79.3857], r:[-79.62,-79.36], lv:1},
+  {n:'Danforth Ave', a:[43.6709,-79.3857], r:[-79.36,-79.24], lv:1},
+  {n:'Dundas St W', a:[43.6561,-79.3802], r:[-79.55,-79.33], lv:2},
+  {n:'Queen St', a:[43.6525,-79.3790], r:[-79.48,-79.28], lv:2},
+  {n:'Highway 7', a:[43.8530,-79.3370], r:[-79.60,-79.15], lv:1},
+  {n:'Major Mackenzie Dr', a:[43.8800,-79.4380], r:[-79.62,-79.20], lv:1},
+  {n:'Dundas St E', a:[43.5850,-79.6180], r:[-79.75,-79.56], lv:1},
+  {n:'Eglinton Ave W', a:[43.6003,-79.6869], r:[-79.75,-79.62], lv:1},
+];
+const ROADS_NS = [
+  {n:'Yonge St', a:[43.7066,-79.3984], r:[43.64,44.06], lv:1},
+  {n:'Bathurst St', a:[43.6654,-79.4110], r:[43.635,43.92], lv:1},
+  {n:'Dufferin St', a:[43.6600,-79.4350], r:[43.63,43.88], lv:1},
+  {n:'Keele St', a:[43.7637,-79.4911], r:[43.65,43.92], lv:1},
+  {n:'Jane St', a:[43.6500,-79.4840], r:[43.64,43.92], lv:1},
+  {n:'Islington Ave', a:[43.6847,-79.5277], r:[43.60,43.88], lv:1},
+  {n:'Bayview Ave', a:[43.7115,-79.3765], r:[43.68,43.95], lv:1},
+  {n:'Leslie St', a:[43.7686,-79.3762], r:[43.66,43.92], lv:1},
+  {n:'Don Mills Rd', a:[43.7213,-79.3375], r:[43.68,43.90], lv:1},
+  {n:'Warden Ave', a:[43.8530,-79.3370], r:[43.69,43.92], lv:1},
+  {n:'Kennedy Rd', a:[43.7766,-79.2769], r:[43.69,43.92], lv:1},
+  {n:'Pape Ave', a:[43.6789,-79.3449], r:[43.662,43.70], lv:2},
+  {n:'Broadview Ave', a:[43.6590,-79.3497], r:[43.655,43.69], lv:2},
+  {n:'Ossington Ave', a:[43.6496,-79.4207], r:[43.642,43.67], lv:2},
+  {n:'Hurontario St', a:[43.5850,-79.6180], r:[43.55,43.72], lv:1},
+  {n:'Mavis Rd', a:[43.6003,-79.6869], r:[43.56,43.68], lv:1},
+];
+const HWY = [
+  {n:'401', pts:[[43.690,-79.640],[43.700,-79.595],[43.716,-79.525],[43.727,-79.470],[43.745,-79.410],[43.758,-79.350],[43.772,-79.300],[43.795,-79.220],[43.815,-79.150]]},
+  {n:'DVP', pts:[[43.655,-79.355],[43.680,-79.352],[43.705,-79.335],[43.730,-79.334],[43.758,-79.340],[43.772,-79.343]]},
+  {n:'404', pts:[[43.772,-79.343],[43.810,-79.350],[43.860,-79.362],[43.920,-79.380]]},
+  {n:'Gardiner', pts:[[43.612,-79.545],[43.624,-79.480],[43.633,-79.440],[43.638,-79.400],[43.645,-79.365],[43.655,-79.355]]},
+  {n:'400', pts:[[43.716,-79.525],[43.760,-79.535],[43.810,-79.545],[43.870,-79.555]]},
+  {n:'427', pts:[[43.612,-79.545],[43.640,-79.560],[43.690,-79.585],[43.720,-79.600],[43.760,-79.610]]},
+  {n:'403', pts:[[43.605,-79.560],[43.585,-79.640],[43.560,-79.700]]},
+];
+const SHORE = [[-79.75,43.505],[-79.65,43.548],[-79.59,43.582],[-79.53,43.613],[-79.48,43.627],[-79.45,43.632],[-79.40,43.636],[-79.37,43.640],[-79.345,43.652],[-79.30,43.666],[-79.25,43.688],[-79.20,43.714],[-79.15,43.742],[-79.05,43.80]];
+const PARKS = [
+  {n:'High Park', c:[43.6465,-79.4637], rx:.75, ry:1.0},
+  {n:'Downsview Park', c:[43.7425,-79.4780], rx:.7, ry:.55},
+  {n:'Sunnybrook Park', c:[43.7230,-79.3570], rx:.9, ry:.6},
+  {n:'Mount Pleasant Cemetery', c:[43.6955,-79.3850], rx:.75, ry:.38},
+  {n:'Earl Bales Park', c:[43.7565,-79.4345], rx:.4, ry:.35},
+  {n:'Centennial Park', c:[43.6490,-79.5880], rx:.6, ry:.5},
+  {n:'Rouge Park', c:[43.8100,-79.1700], rx:2.5, ry:2.0},
+  {n:'Riverdale Park', c:[43.6700,-79.3560], rx:.35, ry:.45},
+  {n:"Taylor Creek Park", c:[43.6990,-79.3150], rx:.9, ry:.22},
+  {n:'Kariya Park', c:[43.5920,-79.6290], rx:.2, ry:.15},
+];
+const VALLEYS = [ // green ribbons: Don Valley, Humber River
+  [[43.655,-79.358],[43.680,-79.357],[43.700,-79.342],[43.725,-79.340],[43.760,-79.343]],
+  [[43.630,-79.477],[43.660,-79.496],[43.690,-79.513],[43.720,-79.528],[43.760,-79.545]],
+];
+const HOODS = [['North York',43.768,-79.414],['Midtown',43.700,-79.400],['Downtown',43.651,-79.383],['Etobicoke',43.655,-79.525],['Scarborough',43.775,-79.255],['East York',43.692,-79.330],['York',43.690,-79.465],['Markham',43.860,-79.320],['Mississauga',43.590,-79.650],['Vaughan',43.835,-79.510],['Richmond Hill',43.880,-79.430],['The Annex',43.668,-79.405],['Leaside',43.707,-79.368]];
+const LOCAL_NAMES = ['Oriole Pkwy','Duplex Ave','Lascelles Blvd','Heath St','Balliol St','Merton St','Glebe Rd','Hillsdale Ave','Manor Rd','Soudan Ave','Belsize Dr','Millwood Rd','Davisville Ave','Chaplin Cres','Kilbarry Rd','Briar Hill Ave','Roselawn Ave','Castlefield Ave','Ridley Blvd','Wanless Ave','Fairlawn Ave','Melrose Ave','Brooke Ave','Cranbrooke Ave','Elmhurst Ave','Hollywood Ave','Byng Ave','Kenneth Ave','Spring Garden Ave','Ellerslie Ave','Empress Ave','Greenfield Ave','Florence Ave','Churchill Ave','Glendora Ave','Princess Ave'];
+
+const hashStr = s => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0); };
+function shoreLat(lng){
+  if (lng <= SHORE[0][0]) return SHORE[0][1];
+  for (let i = 1; i < SHORE.length; i++) if (lng <= SHORE[i][0]) { const [x0,y0] = SHORE[i-1], [x1,y1] = SHORE[i]; return y0 + (y1-y0)*(lng-x0)/(x1-x0); }
+  return SHORE[SHORE.length-1][1];
+}
+const inLake = p => p.lat < shoreLat(p.lng) - 0.0004 && !(p.lat > 43.612 && p.lat < 43.629 && p.lng > -79.40 && p.lng < -79.35);
+const ewLat = (rd, lng) => rd.a[0] + SE*(lng - rd.a[1]);
+const nsLng = (rd, lat) => rd.a[1] - SN*(lat - rd.a[0]);
+// where an east-west line through P meets a north-south line through J
+function gridCorner(P, J){ const b = P.lat - SE*P.lng, d = J.lng + SN*J.lat; const lat = (b + SE*d)/(1 + SE*SN); return {lat, lng: d - SN*lat}; }
+function nearestRoadObj(p, ns){
+  let best = null, bd = 1;
+  for (const rd of ns ? ROADS_NS : ROADS_EW){
+    const inR = ns ? (p.lat >= rd.r[0] && p.lat <= rd.r[1]) : (p.lng >= rd.r[0] && p.lng <= rd.r[1]);
+    if (!inR) continue;
+    const dd = ns ? Math.abs(p.lng - nsLng(rd, p.lat)) : Math.abs(p.lat - ewLat(rd, p.lng));
+    if (dd < bd) { bd = dd; best = rd; }
+  }
+  return bd < 0.008 ? best : null;
+}
+function nearestRoad(p, ns){
+  let best = null, bd = 1;
+  for (const rd of ns ? ROADS_NS : ROADS_EW){
+    const inR = ns ? (p.lat >= rd.r[0] && p.lat <= rd.r[1]) : (p.lng >= rd.r[0] && p.lng <= rd.r[1]);
+    if (!inR) continue;
+    const dd = ns ? Math.abs(p.lng - nsLng(rd, p.lat)) : Math.abs(p.lat - ewLat(rd, p.lng));
+    if (dd < bd) { bd = dd; best = rd; }
+  }
+  return bd < 0.006 ? best.n : null;
+}
+
+/* opts: center, ppk (pixels per km), w, h, pins[], poly, tech, heading, circle, route[], traffic, heat[] */
+function mapSvg(o){
+  const {center, ppk, w, h} = o;
+  const kx = 111.32*Math.cos(center.lat*Math.PI/180)*ppk, ky = 111.32*ppk;
+  const X = lng => w/2 + (lng-center.lng)*kx, Y = lat => h/2 - (lat-center.lat)*ky;
+  const lngMin = center.lng - (w/2+40)/kx, lngMax = center.lng + (w/2+40)/kx;
+  const latMin = center.lat - (h/2+40)/ky, latMax = center.lat + (h/2+40)/ky;
+  const f = v => v.toFixed(1);
+  const out = [];
+  out.push(`<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Map" font-family="Roboto,Arial,sans-serif">`);
+  out.push(`<defs><radialGradient id="heat"><stop offset="0" stop-color="#FF6B00" stop-opacity=".42"/><stop offset=".6" stop-color="#FF6B00" stop-opacity=".16"/><stop offset="1" stop-color="#FF6B00" stop-opacity="0"/></radialGradient>
+    <radialGradient id="cone" cx="0" cy="1" r="1"><stop offset="0" stop-color="#4285F4" stop-opacity=".45"/><stop offset="1" stop-color="#4285F4" stop-opacity="0"/></radialGradient></defs>`);
+  out.push(`<rect width="${w}" height="${h}" fill="#F1F3F4"/>`);
+  // parks & valleys
+  for (const pk of PARKS){ const cx = X(pk.c[1]), cy = Y(pk.c[0]), rx = pk.rx*ppk, ry = pk.ry*ppk;
+    if (cx+rx < 0 || cx-rx > w || cy+ry < 0 || cy-ry > h) continue;
+    out.push(`<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" transform="rotate(-17 ${f(cx)} ${f(cy)})" fill="#CEEAD6"/>`); }
+  for (const v of VALLEYS) out.push(`<polyline points="${v.map(p=>f(X(p[1]))+','+f(Y(p[0]))).join(' ')}" fill="none" stroke="#CEEAD6" stroke-width="${f(Math.max(6, .45*ppk))}" stroke-linecap="round" stroke-linejoin="round"/>`);
+  // street-level blocks: buildings + local streets
+  const ang = Math.atan2(-SE*ky, kx)*180/Math.PI; // screen angle of east-west streets
+  if (ppk >= 900){
+    const stB = 0.0011, stD = 0.0016;
+    const bOf = (lat,lng) => lat - SE*lng, dOf = (lat,lng) => lng + SN*lat;
+    const corners = [[latMin,lngMin],[latMin,lngMax],[latMax,lngMin],[latMax,lngMax]];
+    const bs = corners.map(c=>bOf(...c)), ds = corners.map(c=>dOf(...c));
+    const b0 = Math.floor(Math.min(...bs)/stB), b1 = Math.ceil(Math.max(...bs)/stB), d0 = Math.floor(Math.min(...ds)/stD), d1 = Math.ceil(Math.max(...ds)/stD);
+    const toLL = (b,d) => { const lat = (b + SE*d)/(1+SE*SN); return {lat, lng: d - SN*lat}; };
+    if ((b1-b0)*(d1-d0) < 900){
+      const hw = 11*ppk/1000, hd = 14*ppk/1000;
+      for (let i=b0;i<b1;i++) for (let j=d0;j<d1;j++){
+        const c = toLL((i+.5)*stB, (j+.5)*stD); if (inLake(c)) continue;
+        if (ROADS_EW.some(rd => c.lng>=rd.r[0] && c.lng<=rd.r[1] && Math.abs(c.lat-ewLat(rd,c.lng))*111 < .07) || ROADS_NS.some(rd => c.lat>=rd.r[0] && c.lat<=rd.r[1] && Math.abs(c.lng-nsLng(rd,c.lat))*80.5 < .075)) continue;
+        const cx = X(c.lng), cy = Y(c.lat), seed = (i*7349 + j*911) >>> 0;
+        if (seed % 11 === 0) { out.push(`<rect x="${f(cx-45*ppk/1000)}" y="${f(cy-35*ppk/1000)}" width="${f(90*ppk/1000)}" height="${f(70*ppk/1000)}" rx="4" transform="rotate(${f(ang)} ${f(cx)} ${f(cy)})" fill="#CEEAD6"/>`); continue; }
+        let g = `<g transform="rotate(${f(ang)} ${f(cx)} ${f(cy)})" fill="#E3E5E8" stroke="#D5D8DC">`;
+        for (let k=-2;k<=2;k++){ const bx = cx + k*26*ppk/1000; g += `<rect x="${f(bx-hw/2)}" y="${f(cy-40*ppk/1000)}" width="${f(hw)}" height="${f(hd)}" rx="1.5"/><rect x="${f(bx-hw/2)}" y="${f(cy+26*ppk/1000)}" width="${f(hw)}" height="${f(hd)}" rx="1.5"/>`; }
+        out.push(g + '</g>');
+      }
+      const sw = Math.min(26, 10*ppk/1000);
+      for (let i=b0;i<=b1;i++){ const p1 = toLL(i*stB, d0*stD), p2 = toLL(i*stB, d1*stD);
+        out.push(`<line x1="${f(X(p1.lng))}" y1="${f(Y(p1.lat))}" x2="${f(X(p2.lng))}" y2="${f(Y(p2.lat))}" stroke="#DADCE0" stroke-width="${f(sw+3)}"/><line x1="${f(X(p1.lng))}" y1="${f(Y(p1.lat))}" x2="${f(X(p2.lng))}" y2="${f(Y(p2.lat))}" stroke="#fff" stroke-width="${f(sw)}"/>`); }
+      for (let j=d0;j<=d1;j++){ const p1 = toLL(b0*stB, j*stD), p2 = toLL(b1*stB, j*stD);
+        out.push(`<line x1="${f(X(p1.lng))}" y1="${f(Y(p1.lat))}" x2="${f(X(p2.lng))}" y2="${f(Y(p2.lat))}" stroke="#DADCE0" stroke-width="${f(sw+3)}"/><line x1="${f(X(p1.lng))}" y1="${f(Y(p1.lat))}" x2="${f(X(p2.lng))}" y2="${f(Y(p2.lat))}" stroke="#fff" stroke-width="${f(sw)}"/>`); }
+      if (ppk >= 1500){ // local street names
+        for (let i=b0+1;i<b1;i++){ const p = toLL(i*stB, (d0+d1)/2*stD + ((i%3)-1)*stD*0.5); const x = X(p.lng), y = Y(p.lat); if (x<30||x>w-30||y<20||y>h-20||inLake(p)) continue;
+          out.push(`<text x="${f(x)}" y="${f(y)}" transform="rotate(${f(ang)} ${f(x)} ${f(y)})" text-anchor="middle" dominant-baseline="central" font-size="10.5" fill="#70757A" stroke="#fff" stroke-width="3" paint-order="stroke">${LOCAL_NAMES[(i>>>0)%LOCAL_NAMES.length]}</text>`); }
+      }
+    }
+  } else if (ppk >= 70){ // neighbourhood collectors every ~500 m
+    const stB = 0.0045, stD = 0.0065, toLL = (b,d) => { const lat = (b + SE*d)/(1+SE*SN); return {lat, lng: d - SN*lat}; };
+    const bOf = (lat,lng) => lat - SE*lng, dOf = (lat,lng) => lng + SN*lat;
+    const b0 = Math.floor(Math.min(bOf(latMin,lngMax),bOf(latMin,lngMin))/stB), b1 = Math.ceil(Math.max(bOf(latMax,lngMin),bOf(latMax,lngMax))/stB);
+    const d0 = Math.floor(Math.min(dOf(latMin,lngMin),dOf(latMax,lngMin))/stD), d1 = Math.ceil(Math.max(dOf(latMin,lngMax),dOf(latMax,lngMax))/stD);
+    const sw = Math.max(1.5, ppk/90);
+    for (let i=b0;i<=b1;i++){ const p1 = toLL(i*stB, d0*stD), p2 = toLL(i*stB, d1*stD); out.push(`<line x1="${f(X(p1.lng))}" y1="${f(Y(p1.lat))}" x2="${f(X(p2.lng))}" y2="${f(Y(p2.lat))}" stroke="#fff" stroke-width="${f(sw)}"/>`); }
+    for (let j=d0;j<=d1;j++){ const p1 = toLL(b0*stB, j*stD), p2 = toLL(b1*stB, j*stD); out.push(`<line x1="${f(X(p1.lng))}" y1="${f(Y(p1.lat))}" x2="${f(X(p2.lng))}" y2="${f(Y(p2.lat))}" stroke="#fff" stroke-width="${f(sw)}"/>`); }
+  }
+  // arterials
+  const segs = [];
+  for (const rd of ROADS_EW){ const l0 = Math.max(lngMin, rd.r[0]), l1 = Math.min(lngMax, rd.r[1]); if (l0 >= l1) continue;
+    const p1 = {lat: ewLat(rd,l0), lng:l0}, p2 = {lat: ewLat(rd,l1), lng:l1}; if (Math.max(p1.lat,p2.lat) < latMin || Math.min(p1.lat,p2.lat) > latMax) continue; segs.push([rd,p1,p2,false]); }
+  for (const rd of ROADS_NS){ const l0 = Math.max(latMin, rd.r[0]), l1 = Math.min(latMax, rd.r[1]); if (l0 >= l1) continue;
+    const p1 = {lat:l0, lng: nsLng(rd,l0)}, p2 = {lat:l1, lng: nsLng(rd,l1)}; if (Math.max(p1.lng,p2.lng) < lngMin || Math.min(p1.lng,p2.lng) > lngMax) continue; segs.push([rd,p1,p2,true]); }
+  const aw = Math.max(2.2, Math.min(22, ppk*0.018));
+  for (const [rd,p1,p2] of segs) out.push(`<line x1="${f(X(p1.lng))}" y1="${f(Y(p1.lat))}" x2="${f(X(p2.lng))}" y2="${f(Y(p2.lat))}" stroke="#D2D5DA" stroke-width="${f(aw+2.5)}" stroke-linecap="round"/>`);
+  for (const [rd,p1,p2] of segs) out.push(`<line x1="${f(X(p1.lng))}" y1="${f(Y(p1.lat))}" x2="${f(X(p2.lng))}" y2="${f(Y(p2.lat))}" stroke="#fff" stroke-width="${f(aw)}" stroke-linecap="round"/>`);
+  // highways
+  const hw = Math.max(3, Math.min(26, ppk*0.022));
+  for (const hy of HWY){ const pts = hy.pts.map(p=>f(X(p[1]))+','+f(Y(p[0]))).join(' ');
+    out.push(`<polyline points="${pts}" fill="none" stroke="#E0B53C" stroke-width="${f(hw+2.5)}" stroke-linejoin="round" stroke-linecap="round"/><polyline points="${pts}" fill="none" stroke="#FCD670" stroke-width="${f(hw)}" stroke-linejoin="round" stroke-linecap="round"/>`); }
+  // live traffic
+  if (o.traffic){
+    const tc = ['#1E8E3E','#1E8E3E','#1E8E3E','#1E8E3E','#1E8E3E','#F29900','#F29900','#D93025','#1E8E3E','#1E8E3E'];
+    const tw = Math.max(2, Math.min(8, aw*0.5));
+    for (const [rd,p1,p2] of segs){ const n = 14; for (let i=0;i<n;i++){ const a = {lat:p1.lat+(p2.lat-p1.lat)*i/n, lng:p1.lng+(p2.lng-p1.lng)*i/n}, b = {lat:p1.lat+(p2.lat-p1.lat)*(i+1)/n, lng:p1.lng+(p2.lng-p1.lng)*(i+1)/n};
+      const c = tc[hashStr(rd.n + Math.round(a.lat*80) + Math.round(a.lng*80)) % tc.length]; out.push(`<line x1="${f(X(a.lng))}" y1="${f(Y(a.lat))}" x2="${f(X(b.lng))}" y2="${f(Y(b.lat))}" stroke="${c}" stroke-width="${f(tw)}" stroke-linecap="round"/>`); } }
+    for (const hy of HWY) for (let i=1;i<hy.pts.length;i++){ const a = hy.pts[i-1], b = hy.pts[i]; const c = tc[hashStr(hy.n+i) % tc.length];
+      out.push(`<line x1="${f(X(a[1]))}" y1="${f(Y(a[0]))}" x2="${f(X(b[1]))}" y2="${f(Y(b[0]))}" stroke="${c}" stroke-width="${f(Math.max(2.5,hw*0.5))}" stroke-linecap="round"/>`); }
+  }
+  // water
+  const sp = []; for (let i=0;i<=40;i++){ const lng = lngMin + (lngMax-lngMin)*i/40; sp.push(f(X(lng))+','+f(Y(shoreLat(lng)))); }
+  out.push(`<polygon points="${sp.join(' ')} ${f(w+500)},${f(h+3000)} -500,${f(h+3000)}" fill="#AADAFF"/>`);
+  const ix = X(-79.378), iy = Y(43.621); out.push(`<ellipse cx="${f(ix)}" cy="${f(iy)}" rx="${f(1.7*ppk)}" ry="${f(.45*ppk)}" transform="rotate(-12 ${f(ix)} ${f(iy)})" fill="#CEEAD6"/>`);
+  if (ppk < 400){ const lx = X(-79.30), ly = Y(43.61); if (lx>0&&lx<w&&ly>0&&ly<h) out.push(`<text x="${f(lx)}" y="${f(ly)}" text-anchor="middle" font-size="13" font-style="italic" fill="#4F8EC9">Lake Ontario</text>`); }
+  // heat (busy areas)
+  if (o.heat) for (const p of o.heat){ const r = 3.2*ppk; out.push(`<circle cx="${f(X(p.lng))}" cy="${f(Y(p.lat))}" r="${f(r)}" fill="url(#heat)"/>`); }
+  // labels: neighbourhoods, parks, arterials, highway shields
+  if (ppk >= 9 && ppk <= 260) for (const [n,la,lo] of HOODS){ const x = X(lo), y = Y(la); if (x<20||x>w-20||y<20||y>h-20) continue;
+    out.push(`<text x="${f(x)}" y="${f(y)}" text-anchor="middle" font-size="${ppk<30?12:13}" font-weight="500" letter-spacing=".6" fill="#80868B" stroke="#F1F3F4" stroke-width="3" paint-order="stroke">${n.toUpperCase()}</text>`); }
+  if (ppk >= 150) for (const pk of PARKS){ const x = X(pk.c[1]), y = Y(pk.c[0]); if (x<20||x>w-20||y<20||y>h-20) continue;
+    out.push(`<text x="${f(x)}" y="${f(y)}" text-anchor="middle" font-size="11.5" fill="#137333" stroke="#fff" stroke-width="3" paint-order="stroke">${pk.n}</text>`); }
+  if (ppk >= 22) for (const [rd,p1,p2,ns] of segs){
+    if (rd.lv > 1 && ppk < 60) continue;
+    const t = 0.22 + (hashStr(rd.n)%56)/100;
+    const p = {lat: p1.lat+(p2.lat-p1.lat)*t, lng: p1.lng+(p2.lng-p1.lng)*t};
+    const x = X(p.lng), y = Y(p.lat); if (x<40||x>w-40||y<24||y>h-24||inLake(p)) continue;
+    let a = Math.atan2(Y(p2.lat)-Y(p1.lat), X(p2.lng)-X(p1.lng))*180/Math.PI; if (a > 90) a -= 180; if (a < -90) a += 180;
+    out.push(`<text x="${f(x)}" y="${f(y)}" transform="rotate(${f(a)} ${f(x)} ${f(y)})" text-anchor="middle" dominant-baseline="central" font-size="${ppk>800?12.5:11.5}" font-weight="500" fill="#5F6368" stroke="#fff" stroke-width="3.5" paint-order="stroke">${rd.n}</text>`); }
+  for (const hy of HWY){ const m = hy.pts[Math.floor(hy.pts.length/2)]; const x = X(m[1]), y = Y(m[0]); if (x<20||x>w-20||y<20||y>h-20) continue;
+    const wd = hy.n.length*7.5+10; out.push(`<g transform="translate(${f(x)} ${f(y)})"><rect x="${f(-wd/2)}" y="-10" width="${f(wd)}" height="20" rx="5" fill="#fff" stroke="#1A73E8" stroke-width="1.5"/><text text-anchor="middle" dominant-baseline="central" font-size="11.5" font-weight="700" fill="#1A73E8">${hy.n}</text></g>`); }
+  // overlays
+  if (o.circle) out.push(`<circle cx="${f(X(o.circle.lng))}" cy="${f(Y(o.circle.lat))}" r="${f(o.circle.km*ppk)}" fill="#4285F412" stroke="#4285F488" stroke-width="1.5" stroke-dasharray="6 5"/>`);
+  if (o.poly) out.push(`<polygon points="${o.poly.map(p=>f(X(p.lng))+','+f(Y(p.lat))).join(' ')}" fill="#FF6B0040" stroke="#FF6B00" stroke-width="3" stroke-dasharray="8 5"/>`);
+  if (o.records) for (const r of o.records){ const pts = r.pts.map(p=>f(X(p.lng))+','+f(Y(p.lat))).join(' ');
+    out.push(`<polyline points="${pts}" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".7"/><polyline points="${pts}" fill="none" stroke="${r.color}" stroke-width="4" stroke-dasharray="10 6" stroke-linecap="round"/>`);
+    if (r.label){ const m = r.pts[0]; out.push(`<text x="${f(X(m.lng)+6)}" y="${f(Y(m.lat)-6)}" font-size="11" font-weight="700" fill="${r.color}" stroke="#fff" stroke-width="3" paint-order="stroke">${r.label}</text>`); } }
+  if (o.route && o.route.length > 1){ const pts = o.route.map(p=>f(X(p.lng))+','+f(Y(p.lat))).join(' ');
+    out.push(`<polyline points="${pts}" fill="none" stroke="#1967D2" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/><polyline points="${pts}" fill="none" stroke="#4285F4" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>`); }
+  for (const p of (o.pins||[])){
+    const x = X(p.lng), y = Y(p.lat); if (x<-30||x>w+30||y<-50||y>h+30) continue;
+    const sc = p.sel ? 1.3 : 1, col = p.color || '#FF6B00', dark = p.dark || '#B33F00';
+    out.push(`<g class="pin" data-act="${p.act||''}" data-arg="${p.id}" transform="translate(${f(x)} ${f(y)}) scale(${sc})" style="cursor:pointer">
+      <ellipse cx="0" cy="0" rx="5" ry="2" fill="#0004"/>
+      <path d="M0 0 C-2 -7 -11 -13 -11 -22 a11 11 0 0 1 22 0 C11 -13 2 -7 0 0z" fill="${col}" stroke="${dark}" stroke-width="1.2"/>
+      <circle cx="0" cy="-22" r="4" fill="${dark}"/>${p.badge?`<text y="-18" text-anchor="middle" font-size="11" font-weight="900" fill="#fff">${p.badge}</text>`:''}
+      ${p.label?`<text y="-38" text-anchor="middle" font-size="12" font-weight="700" fill="#202124" stroke="#fff" stroke-width="3" paint-order="stroke">${p.label}</text>`:''}</g>`);
+  }
+  for (const c of (o.cars||[])){ const x = X(c.lng), y = Y(c.lat); if (x<-20||x>w+20||y<-20||y>h+20) continue;
+    out.push(`<g transform="translate(${f(x)} ${f(y)})"><circle r="15" fill="#fff" stroke="#1565D8" stroke-width="2"/><path d="M-8 3 l2-6 c.5-1.3 1.4-2 2.8-2 h6.4 c1.4 0 2.3.7 2.8 2 l2 6 v4 h-3 v-2 h-10 v2 h-3z" fill="#1565D8"/>${c.label?`<text y="-20" text-anchor="middle" font-size="11.5" font-weight="700" fill="#202124" stroke="#fff" stroke-width="3" paint-order="stroke">${c.label}</text>`:''}</g>`); }
+  if (o.tech){ const x = X(o.tech.lng), y = Y(o.tech.lat);
+    out.push(`<circle cx="${f(x)}" cy="${f(y)}" r="${f(Math.max(22, .03*ppk))}" fill="#4285F41F"/>`);
+    if (o.heading != null) out.push(`<path d="M${f(x)} ${f(y)} L${f(x-20)} ${f(y-46)} A50 50 0 0 1 ${f(x+20)} ${f(y-46)} Z" fill="url(#cone)" transform="rotate(${f(o.heading)} ${f(x)} ${f(y)})"/>`);
+    out.push(`<circle cx="${f(x)}" cy="${f(y)}" r="9" fill="#4285F4" stroke="#fff" stroke-width="3"/>`); }
+  // Google-style scale bar
+  const nice = [0.05,0.1,0.2,0.5,1,2,5,10,20], km = nice.find(k => k*ppk > 60) || 20, sx = km*ppk;
+  out.push(`<g transform="translate(${f(w-sx-12)} ${f(h-14)})"><rect x="-4" y="-14" width="${f(sx+8)}" height="18" rx="3" fill="#ffffffcc"/><path d="M0 0 h${f(sx)}" stroke="#5F6368" stroke-width="2"/><text x="${f(sx/2)}" y="-4" text-anchor="middle" font-size="10" fill="#5F6368">${km<1?km*1000+' m':km+' km'}</text></g>`);
+  return out.join('') + '</svg>';
+}
+
+{
+const JOBS0 = [{"id":"job_004","ticketNumber":"20264787326","ticketType":"Remark","priority":"standard","address":"807 Danforth Ave","city":"Toronto","nearestIntersection":"Danforth Ave & Pape Ave","lat":43.678852,"lng":-79.342326,"digAreaPolygon":[{"lat":43.678657,"lng":-79.342176},{"lat":43.678948,"lng":-79.342047},{"lat":43.679047,"lng":-79.342476},{"lat":43.678756,"lng":-79.342605}],"workType":"Sidewalk reconstruction","workDescription":"Remove and replace sidewalk panels, 0.3 m depth","locateAreaInstructions":"Locate both sides of the street for 20 m in front of the address.","utilityTypes":["gas","hydro","telecom","fibre","water"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)","Rogers Communications (ROG)","City of Toronto Water & Wastewater (TORWW)"],"requesterName":"Arjun Hassan","requesterCompany":"Summit Fibre Builders","requesterPhone":"705-555-1528","dueBy":"2026-11-26T23:59:00-05:00","workToBeginDate":"2026-11-26T07:00:00-05:00","status":"uio_review","techNotes":null,"checklist":null,"assignedTechName":null},{"id":"job_005","ticketNumber":"20264701572","ticketType":"Design and Planning","priority":"standard","address":"353 Finch Ave W","city":"Toronto","nearestIntersection":"Finch Ave W & Keele St","lat":43.76419,"lng":-79.490204,"digAreaPolygon":[{"lat":43.763889,"lng":-79.490071},{"lat":43.764393,"lng":-79.489868},{"lat":43.764491,"lng":-79.490337},{"lat":43.763987,"lng":-79.49054}],"workType":"Fibre install - directional bore","workDescription":"Bore from pole line to building, 1 m depth","locateAreaInstructions":"Locate both sides of the street for 20 m in front of the address.","utilityTypes":["gas","hydro","telecom","fibre"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)","Rogers Communications (ROG)"],"requesterName":"Dan Nguyen","requesterCompany":"Cedarvale Landscaping","requesterPhone":"613-555-2710","dueBy":"2026-11-23T23:59:00-05:00","workToBeginDate":"2026-11-23T07:00:00-05:00","status":"uio_review","techNotes":null,"checklist":null,"assignedTechName":null},{"id":"job_006","ticketNumber":"20264753396","ticketType":"Large project (ALR)","priority":"standard","address":"50 Sheppard Ave E","city":"Toronto","nearestIntersection":"Sheppard Ave E & Kennedy Rd","lat":43.778476,"lng":-79.278259,"digAreaPolygon":[{"lat":43.778282,"lng":-79.278159},{"lat":43.778453,"lng":-79.277973},{"lat":43.77867,"lng":-79.278359},{"lat":43.778499,"lng":-79.278545}],"workType":"Tree planting","workDescription":"Municipal boulevard tree, 1 m depth","locateAreaInstructions":"Locate 3 m radius around the white paint mark on the boulevard.","utilityTypes":["gas","hydro","telecom","water"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)","City of Toronto Water & Wastewater (TORWW)","Rogers Communications (ROG)"],"requesterName":"Megan Wilson","requesterCompany":"Redline Signs Ontario","requesterPhone":"519-555-0641","dueBy":"2026-11-24T23:59:00-05:00","workToBeginDate":"2026-11-24T07:00:00-05:00","status":"uio_review","techNotes":null,"checklist":null,"assignedTechName":null},{"id":"job_008","ticketNumber":"20264783903","ticketType":"Standard","priority":"standard","address":"1894 Dundas St W","city":"Toronto","nearestIntersection":"Dundas St W & Ossington Ave","lat":43.648043,"lng":-79.423073,"digAreaPolygon":[{"lat":43.647838,"lng":-79.423084},{"lat":43.648153,"lng":-79.422835},{"lat":43.648248,"lng":-79.423062},{"lat":43.647933,"lng":-79.423311}],"workType":"Deck footings","workDescription":"Concrete piers in rear yard, 1.2 m depth","locateAreaInstructions":"Locate entire rear yard, lot line to lot line.","utilityTypes":["gas","hydro","telecom"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)"],"requesterName":"Ryan Campbell","requesterCompany":"Blue Heron Directional Drilling","requesterPhone":"705-555-2312","dueBy":"2026-11-24T23:59:00-05:00","workToBeginDate":"2026-11-24T07:00:00-05:00","status":"uio_review","techNotes":null,"checklist":null,"assignedTechName":null},{"id":"job_001","ticketNumber":"20264790821","ticketType":"Priority","priority":"standard","address":"336 Yonge St","city":"Toronto","nearestIntersection":"Yonge St & Eglinton Ave","lat":43.707756,"lng":-79.398036,"digAreaPolygon":[{"lat":43.707612,"lng":-79.398224},{"lat":43.707658,"lng":-79.397798},{"lat":43.7079,"lng":-79.397848},{"lat":43.707854,"lng":-79.398274}],"workType":"Fence installation","workDescription":"Post holes along rear and side lot lines, 1.2 m depth","locateAreaInstructions":"Locate entire rear yard, lot line to lot line.","utilityTypes":["gas","hydro","telecom"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)"],"requesterName":"Ryan Bouchard","requesterCompany":"TrueGrade Paving Co.","requesterPhone":"905-555-6883","dueBy":"2026-11-25T23:59:00-05:00","workToBeginDate":"2026-11-25T07:00:00-05:00","status":"approved_active","techNotes":null,"checklist":null,"assignedTechName":null},{"id":"job_002","ticketNumber":"20264719962","ticketType":"Priority","priority":"standard","address":"2100 Bloor St W","city":"Toronto","nearestIntersection":"Bloor St W & Dufferin St","lat":43.661292,"lng":-79.433002,"digAreaPolygon":[{"lat":43.66101,"lng":-79.432878},{"lat":43.661514,"lng":-79.432732},{"lat":43.661574,"lng":-79.433126},{"lat":43.66107,"lng":-79.433272}],"workType":"Driveway replacement","workDescription":"Excavate and regrade driveway, 0.4 m depth","locateAreaInstructions":"Locate entire front lot from building line to curb.","utilityTypes":["gas","hydro","telecom"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)"],"requesterName":"Priya Hassan","requesterCompany":"Blue Heron Directional Drilling","requesterPhone":"519-555-4048","dueBy":"2026-11-24T23:59:00-05:00","workToBeginDate":"2026-11-24T07:00:00-05:00","status":"approved_active","techNotes":null,"checklist":null,"assignedTechName":null},{"id":"job_007","ticketNumber":"20264723830","ticketType":"Standard","priority":"standard","address":"341 Lawrence Ave E","city":"Toronto","nearestIntersection":"Lawrence Ave E & Warden Ave","lat":43.744888,"lng":-79.300762,"digAreaPolygon":[{"lat":43.744704,"lng":-79.300673},{"lat":43.744941,"lng":-79.300503},{"lat":43.745072,"lng":-79.300851},{"lat":43.744835,"lng":-79.301021}],"workType":"Sign installation","workDescription":"Pylon sign footing at front of plaza, 2 m depth","locateAreaInstructions":"Locate area marked in white paint and flags at the front of the plaza.","utilityTypes":["gas","hydro","telecom","fibre"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)","Rogers Communications (ROG)"],"requesterName":"Jamal Campbell","requesterCompany":"Northline Excavating Ltd.","requesterPhone":"647-555-3693","dueBy":"2026-11-25T23:59:00-05:00","workToBeginDate":"2026-11-25T07:00:00-05:00","status":"approved_active","techNotes":null,"checklist":null,"assignedTechName":null},{"id":"job_018","ticketNumber":"20264746295","ticketType":"Standard","priority":"standard","address":"201 Warden Ave","city":"Markham","nearestIntersection":"Warden Ave & Highway 7","lat":43.853835,"lng":-79.335852,"digAreaPolygon":[{"lat":43.853691,"lng":-79.335859},{"lat":43.853884,"lng":-79.335664},{"lat":43.853979,"lng":-79.335845},{"lat":43.853786,"lng":-79.33604}],"workType":"Driveway replacement","workDescription":"Excavate and regrade driveway, 0.4 m depth","locateAreaInstructions":"Locate entire front lot from building line to curb.","utilityTypes":["gas","hydro","telecom"],"membersNotified":["Enbridge Gas (ENB)","Alectra Utilities (ALCT)","Bell Canada (BCTS)","Rogers Communications (ROG)"],"requesterName":"Aisha Sharma","requesterCompany":"Trillium Hydrovac Services","requesterPhone":"613-555-1197","dueBy":"2026-11-24T23:59:00-05:00","workToBeginDate":"2026-11-24T07:00:00-05:00","status":"approved_active","techNotes":null,"checklist":null,"assignedTechName":null},{"id":"job_063","ticketNumber":"20264781700","ticketType":"Priority","priority":"standard","address":"795 Hurontario St","city":"Mississauga","nearestIntersection":"Hurontario St & Dundas St E","lat":43.585717,"lng":-79.619561,"digAreaPolygon":[{"lat":43.585538,"lng":-79.619541},{"lat":43.585732,"lng":-79.619313},{"lat":43.585896,"lng":-79.619581},{"lat":43.585702,"lng":-79.619809}],"workType":"Catch basin repair","workDescription":"Excavate around catch basin in roadway, 1.8 m depth","locateAreaInstructions":"Locate road allowance on the north side, 30 m east and west of the intersection.","utilityTypes":["gas","hydro","telecom","water","sewer"],"membersNotified":["Enbridge Gas (ENB)","Alectra Utilities (ALCT)","Bell Canada (BCTS)","City of Mississauga Water & Wastewater (MISWW)","Rogers Communications (ROG)"],"requesterName":"Luis MacLeod","requesterCompany":"Ironwood Utility Contractors","requesterPhone":"905-555-6338","dueBy":"2026-11-25T23:59:00-05:00","workToBeginDate":"2026-11-25T07:00:00-05:00","status":"approved_active","techNotes":null,"checklist":null,"assignedTechName":null},{"id":"job_011","ticketNumber":"20264716754","ticketType":"Priority","priority":"standard","address":"350 Hurontario St","city":"Mississauga","nearestIntersection":"Hurontario St & Dundas St E","lat":43.583748,"lng":-79.620181,"digAreaPolygon":[{"lat":43.583569,"lng":-79.620203},{"lat":43.583806,"lng":-79.619946},{"lat":43.583927,"lng":-79.620159},{"lat":43.58369,"lng":-79.620416}],"workType":"Sidewalk reconstruction","workDescription":"Remove and replace sidewalk panels, 0.3 m depth","locateAreaInstructions":"Locate both sides of the street for 20 m in front of the address.","utilityTypes":["gas","hydro","telecom","fibre","water"],"membersNotified":["Enbridge Gas (ENB)","Alectra Utilities (ALCT)","Bell Canada (BCTS)","Rogers Communications (ROG)","City of Mississauga Water & Wastewater (MISWW)"],"requesterName":"Megan Ferreira","requesterCompany":"Blue Heron Directional Drilling","requesterPhone":"289-555-4311","dueBy":"2026-11-23T23:59:00-05:00","workToBeginDate":"2026-11-23T07:00:00-05:00","status":"completed_pending_review","techNotes":"Clear for all requested utilities except hydro, marked along south lot line.","checklist":{"gas":"located","hydro":"located","telecom":"located","fibre":"located","water":"located"},"assignedTechName":"Simran Gill"},{"id":"job_010","ticketNumber":"20264770403","ticketType":"Emergency","priority":"emergency","address":"1324 Bathurst St","city":"Toronto","nearestIntersection":"Bathurst St & Steeles Ave W","lat":43.793325,"lng":-79.447829,"digAreaPolygon":[{"lat":43.793151,"lng":-79.448062},{"lat":43.793193,"lng":-79.447548},{"lat":43.793499,"lng":-79.447596},{"lat":43.793457,"lng":-79.44811}],"workType":"Catch basin repair","workDescription":"Excavate around catch basin in roadway, 1.8 m depth","locateAreaInstructions":"Locate road allowance on the north side, 30 m east and west of the intersection.","utilityTypes":["gas","hydro","telecom","water","sewer"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)","City of Toronto Water & Wastewater (TORWW)"],"requesterName":"Ryan Campbell","requesterCompany":"Summit Fibre Builders","requesterPhone":"905-555-7880","dueBy":"2026-11-19T15:32:00-05:00","workToBeginDate":"2026-11-19T15:32:00-05:00","status":"incoming","techNotes":null,"checklist":null,"assignedTechName":null},{"id":"job_009","ticketNumber":"20264730791","ticketType":"Priority","priority":"standard","address":"856 Eglinton Ave W","city":"Toronto","nearestIntersection":"Eglinton Ave W & Islington Ave","lat":43.685393,"lng":-79.529581,"digAreaPolygon":[{"lat":43.685167,"lng":-79.529491},{"lat":43.685501,"lng":-79.529292},{"lat":43.685619,"lng":-79.529671},{"lat":43.685285,"lng":-79.52987}],"workType":"Pool installation","workDescription":"Inground pool in rear yard, 2.4 m depth","locateAreaInstructions":"Locate entire rear yard, lot line to lot line.","utilityTypes":["gas","hydro","telecom","water"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)","City of Toronto Water & Wastewater (TORWW)"],"requesterName":"Linh Campbell","requesterCompany":"Blue Heron Directional Drilling","requesterPhone":"905-555-4099","dueBy":"2026-11-23T23:59:00-05:00","workToBeginDate":"2026-11-23T07:00:00-05:00","techNotes":null,"checklist":null,"assignedTechName":"Test Technician","status":"scheduled"},{"id":"job_050","ticketNumber":"20264748593","ticketType":"Priority","priority":"standard","address":"1680 Lawrence Ave E","city":"Toronto","nearestIntersection":"Lawrence Ave E & Warden Ave","lat":43.746083,"lng":-79.299081,"digAreaPolygon":[{"lat":43.745968,"lng":-79.298904},{"lat":43.746198,"lng":-79.298904},{"lat":43.746198,"lng":-79.299258},{"lat":43.745968,"lng":-79.299258}],"workType":"Deck footings","workDescription":"Concrete piers in rear yard, 1.2 m depth","locateAreaInstructions":"Locate entire rear yard, lot line to lot line.","utilityTypes":["gas","hydro","telecom"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)"],"requesterName":"Megan Okafor","requesterCompany":"Cedarvale Landscaping","requesterPhone":"416-555-7696","dueBy":"2026-11-23T23:59:00-05:00","workToBeginDate":"2026-11-23T07:00:00-05:00","techNotes":null,"checklist":null,"assignedTechName":"Test Technician","status":"scheduled"},{"id":"job_065","ticketNumber":"20264739678","ticketType":"Standard","priority":"standard","address":"1121 Dundas St W","city":"Toronto","nearestIntersection":"Dundas St W & Ossington Ave","lat":43.649215,"lng":-79.421466,"digAreaPolygon":[{"lat":43.649012,"lng":-79.421467},{"lat":43.649363,"lng":-79.421274},{"lat":43.649418,"lng":-79.421465},{"lat":43.649067,"lng":-79.421658}],"workType":"Pool installation","workDescription":"Inground pool in rear yard, 2.4 m depth","locateAreaInstructions":"Locate entire rear yard, lot line to lot line.","utilityTypes":["gas","hydro","telecom","water"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)","City of Toronto Water & Wastewater (TORWW)","Rogers Communications (ROG)"],"requesterName":"Kevin Bouchard","requesterCompany":"TrueGrade Paving Co.","requesterPhone":"289-555-7247","dueBy":"2026-11-25T23:59:00-05:00","workToBeginDate":"2026-11-25T07:00:00-05:00","techNotes":null,"checklist":null,"assignedTechName":"Test Technician","status":"scheduled"},{"id":"job_079","ticketNumber":"20264737966","ticketType":"Standard","priority":"standard","address":"1964 Sheppard Ave E","city":"Toronto","nearestIntersection":"Sheppard Ave E & Kennedy Rd","lat":43.77848,"lng":-79.279506,"digAreaPolygon":[{"lat":43.77821,"lng":-79.279456},{"lat":43.778703,"lng":-79.279288},{"lat":43.77875,"lng":-79.279556},{"lat":43.778257,"lng":-79.279724}],"workType":"Tree planting","workDescription":"Municipal boulevard tree, 1 m depth","locateAreaInstructions":"Locate 3 m radius around the white paint mark on the boulevard.","utilityTypes":["gas","hydro","telecom","water"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)","City of Toronto Water & Wastewater (TORWW)","Rogers Communications (ROG)"],"requesterName":"Marco Kowalski","requesterCompany":"Redline Signs Ontario","requesterPhone":"519-555-4690","dueBy":"2026-11-24T23:59:00-05:00","workToBeginDate":"2026-11-24T07:00:00-05:00","techNotes":null,"checklist":null,"assignedTechName":"Test Technician","status":"scheduled"},{"id":"job_086","ticketNumber":"20264718764","ticketType":"Standard","priority":"standard","address":"578 Finch Ave W","city":"Toronto","nearestIntersection":"Finch Ave W & Keele St","lat":43.763989,"lng":-79.492455,"digAreaPolygon":[{"lat":43.763837,"lng":-79.492576},{"lat":43.764001,"lng":-79.492213},{"lat":43.764141,"lng":-79.492334},{"lat":43.763977,"lng":-79.492697}],"workType":"Driveway replacement","workDescription":"Excavate and regrade driveway, 0.4 m depth","locateAreaInstructions":"Locate entire front lot from building line to curb.","utilityTypes":["gas","hydro","telecom"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)","Rogers Communications (ROG)"],"requesterName":"Megan MacLeod","requesterCompany":"Blue Heron Directional Drilling","requesterPhone":"705-555-4881","dueBy":"2026-11-23T23:59:00-05:00","workToBeginDate":"2026-11-23T07:00:00-05:00","techNotes":"Water curb stop found 0.5 m east of driveway, marked in blue.","checklist":{"gas":"located","hydro":"located","telecom":"located"},"assignedTechName":"Test Technician","status":"scheduled"},{"id":"job_091","ticketNumber":"20264743322","ticketType":"Standard","priority":"standard","address":"1996 Bloor St W","city":"Toronto","nearestIntersection":"Bloor St W & Dufferin St","lat":43.658464,"lng":-79.434144,"digAreaPolygon":[{"lat":43.658248,"lng":-79.434338},{"lat":43.658345,"lng":-79.433828},{"lat":43.65868,"lng":-79.43395},{"lat":43.658583,"lng":-79.43446}],"workType":"Deck footings","workDescription":"Concrete piers in rear yard, 1.2 m depth","locateAreaInstructions":"Locate entire rear yard, lot line to lot line.","utilityTypes":["gas","hydro","telecom"],"membersNotified":["Enbridge Gas (ENB)","Toronto Hydro (THESL)","Bell Canada (BCTS)"],"requesterName":"Tom Hassan","requesterCompany":"Cedarvale Landscaping","requesterPhone":"647-555-3198","dueBy":"2026-11-24T23:59:00-05:00","workToBeginDate":"2026-11-24T07:00:00-05:00","techNotes":null,"checklist":null,"assignedTechName":"Test Technician","status":"scheduled"},{"id":"job_099","ticketNumber":"20264748786","ticketType":"Standard","priority":"standard","address":"1798 Bathurst St","city":"Toronto","nearestIntersection":"Bathurst St & Steeles Ave W","lat":43.795771,"lng":-79.447435,"digAreaPolygon":[{"lat":43.795609,"lng":-79.447632},{"lat":43.795739,"lng":-79.44714},{"lat":43.795933,"lng":-79.447238},{"lat":43.795803,"lng":-79.44773}],"workType":"Gas service relocation","workDescription":"Trench along side of house, 1 m depth","locateAreaInstructions":"Locate full property including both side yards.","utilityTypes":["hydro","telecom","water"],"membersNotified":["Toronto Hydro (THESL)","Bell Canada (BCTS)","City of Toronto Water & Wastewater (TORWW)"],"requesterName":"Priya Ferreira","requesterCompany":"Maple Ridge Fencing","requesterPhone":"613-555-3768","dueBy":"2026-11-23T23:59:00-05:00","workToBeginDate":"2026-11-23T07:00:00-05:00","techNotes":"Clear for all requested utilities except hydro, marked along south lot line.","checklist":{"hydro":"clear","telecom":"located","water":"located"},"assignedTechName":"Test Technician","status":"scheduled"},{"id":"job_003","ticketNumber":"20264701595","ticketType":"Standard","priority":"standard","address":"1439 Queen St E","city":"Toronto","nearestIntersection":"Queen St E & Broadview Ave","lat":43.660612,"lng":-79.350314,"digAreaPolygon":[{"lat":43.660447,"lng":-79.350267},{"lat":43.660713,"lng":-79.350128},{"lat":43.660777,"lng":-79.350361},{"lat":43.660511,"lng":-79.3505}],"workType":"Hydro pole replacement","workDescription":"Auger new pole beside existing, 2.5 m depth","locateAreaInstructions":"Locate road allowance on the north side, 30 m east and west of the intersection.","utilityTypes":["gas","telecom","fibre","water"],"membersNotified":["Enbridge Gas (ENB)","Bell Canada (BCTS)","Rogers Communications (ROG)","City of Toronto Water & Wastewater (TORWW)"],"requesterName":"Arjun Campbell","requesterCompany":"Redline Signs Ontario","requesterPhone":"416-555-3616","dueBy":"2026-11-24T23:59:00-05:00","workToBeginDate":"2026-11-24T07:00:00-05:00","techNotes":"All plant marked in paint and flags.","checklist":null,"assignedTechName":"Hannah Liu","status":"uio_approved","completedDaysAgo":52,"outcome":"marked","continuation":"received"},{"id":"job_016","ticketNumber":"20264793290","ticketType":"Emergency","priority":"emergency","address":"1280 Weston Rd","city":"Vaughan","nearestIntersection":"Weston Rd & Major Mackenzie Dr W","lat":43.834931,"lng":-79.554964,"digAreaPolygon":[{"lat":43.83475,"lng":-79.555204},{"lat":43.834975,"lng":-79.554622},{"lat":43.835112,"lng":-79.554724},{"lat":43.834887,"lng":-79.555306}],"workType":"Pool installation","workDescription":"Inground pool in rear yard, 2.4 m depth","locateAreaInstructions":"Locate entire rear yard, lot line to lot line.","utilityTypes":["gas","hydro","telecom","water"],"membersNotified":["Enbridge Gas (ENB)","Alectra Utilities (ALCT)","Bell Canada (BCTS)","City of Vaughan Water & Wastewater (VAUWW)","Rogers Communications (ROG)"],"requesterName":"Luis Campbell","requesterCompany":"Cedarvale Landscaping","requesterPhone":"647-555-8414","dueBy":"2026-11-18T00:16:00-05:00","workToBeginDate":"2026-11-18T00:16:00-05:00","techNotes":"All plant marked in paint and flags.","checklist":{"gas":"located","hydro":"located","telecom":"located","water":"located"},"assignedTechName":"Owen Baptiste","status":"uio_approved","completedDaysAgo":48,"outcome":"cleared","continuation":"none"},{"id":"job_017","ticketNumber":"20264773867","ticketType":"Priority","priority":"standard","address":"199 Jane St","city":"Vaughan","nearestIntersection":"Jane St & Rutherford Rd","lat":43.82515,"lng":-79.528189,"digAreaPolygon":[{"lat":43.825013,"lng":-79.52797},{"lat":43.82528,"lng":-79.527962},{"lat":43.825287,"lng":-79.528408},{"lat":43.82502,"lng":-79.528416}],"workType":"Sidewalk reconstruction","workDescription":"Remove and replace sidewalk panels, 0.3 m depth","locateAreaInstructions":"Locate both sides of the street for 20 m in front of the address.","utilityTypes":["gas","hydro","telecom","fibre","water"],"membersNotified":["Enbridge Gas (ENB)","Alectra Utilities (ALCT)","Bell Canada (BCTS)","Rogers Communications (ROG)","City of Vaughan Water & Wastewater (VAUWW)"],"requesterName":"Grace Nguyen","requesterCompany":"Pinecrest Homeowner (private)","requesterPhone":"647-555-8299","dueBy":"2026-11-26T23:59:00-05:00","workToBeginDate":"2026-11-26T07:00:00-05:00","techNotes":"All plant marked in paint and flags.","checklist":null,"assignedTechName":"Mateo Alvarez","status":"uio_approved","completedDaysAgo":46,"outcome":"marked","continuation":"none"},{"id":"job_019","ticketNumber":"20264709578","ticketType":"Emergency","priority":"emergency","address":"387 Main St Unionville","city":"Markham","nearestIntersection":"Main St Unionville & Carlton Rd","lat":43.867727,"lng":-79.310873,"digAreaPolygon":[{"lat":43.867493,"lng":-79.310843},{"lat":43.867811,"lng":-79.310569},{"lat":43.867961,"lng":-79.310903},{"lat":43.867643,"lng":-79.311177}],"workType":"Water service repair","workDescription":"Excavate at curb stop, 2 m depth","locateAreaInstructions":"Locate entire front lot from building line to curb.","utilityTypes":["gas","hydro","telecom","water","sewer"],"membersNotified":["Enbridge Gas (ENB)","Alectra Utilities (ALCT)","Bell Canada (BCTS)","City of Markham Water & Wastewater (MARWW)","Rogers Communications (ROG)"],"requesterName":"Jamal Patel","requesterCompany":"Greybrook Civil Inc.","requesterPhone":"705-555-8341","dueBy":"2026-11-20T11:35:00-05:00","workToBeginDate":"2026-11-20T11:35:00-05:00","techNotes":"All plant marked in paint and flags.","checklist":null,"assignedTechName":"Hannah Liu","status":"uio_approved","completedDaysAgo":31,"outcome":"marked","continuation":"none"}];
+const TECH_HOME = {lat:43.6880, lng:-79.3940};
+const HOME_BASE = {lat:43.7731, lng:-79.2578, name:'Home (Scarborough)'};
+const ME = 'Test Technician';
+const CERTS = {gas:true, hydro:true, telecom:true, water:true, sewer:true, fibre:false};
+const UTIL = {hydro:'#E53935',gas:'#E3B400',telecom:'#FF8F00',fibre:'#FF8F00',water:'#1E88E5',sewer:'#2E7D32'};
+const STATUS = {uio_review:['UIO review','#5B7FA6'],approved_active:['Ready for pickup','#FF6B00'],scheduled:['On my route','#5E35B1'],accepted:['Accepted','#1565D8'],en_route:['On the way','#1565D8'],on_site:['On site','#1565D8'],completed_pending_review:['Awaiting UIO review','#C2185B'],uio_approved:['Complete','#1F9D55'],cleared:['Cleared, no visit','#1F9D55'],rejected:['Rejected','#8A94A3'],disputed:['Disputed','#D42B2B']};
+const TYPES = {'Emergency':'#D42B2B','Priority':'#8E24AA','Standard':'#5B6675','Remark':'#5B7FA6','Design and Planning':'#00897B','Large project (ALR)':'#0F1B2D'};
+const $ = s => document.querySelector(s);
+const app = $('#app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const I = (d, w=24) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}">${d}</svg>`;
+const ICON = {
+  back:I('<path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'),
+  menu:I('<path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'),
+  out:I('<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'),
+  nav:I('<path d="M12 2l7 19-7-4-7 4z" fill="currentColor"/>',20),
+  phone:I('<path d="M6.6 10.8a15 15 0 006.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 013 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z" fill="currentColor"/>',20),
+  chat:I('<path d="M4 4h16v12H8l-4 4z" fill="currentColor"/>',20),
+  flag:I('<path d="M5 21V4h10l1 2h4v10h-7l-1-2H7v7z" fill="currentColor"/>',20),
+  cam:I('<path d="M4 7h3l2-3h6l2 3h3v13H4z M12 17a4 4 0 100-8 4 4 0 000 8z" fill="currentColor" fill-rule="evenodd"/>',20),
+  target:I('<circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="currentColor" stroke-width="2"/>'),
+  layers:I('<path d="M12 3l9 5-9 5-9-5z" fill="currentColor"/><path d="M3 13l9 5 9-5" fill="none" stroke="currentColor" stroke-width="2"/>'),
+  shield:I('<path d="M12 2l8 3v6c0 5-3.5 9.5-8 11-4.5-1.5-8-6-8-11V5z" fill="#1565D8"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'),
+  sliders:I('<path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2.4" fill="none" stroke="currentColor" stroke-width="2"/>',18),
+  dots:I('<circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/>'),
+  desk:I('<rect x="3" y="4" width="18" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 20h8M12 16v4" stroke="currentColor" stroke-width="2"/>'),
+  turnL:'<svg viewBox="0 0 40 40"><path d="M26 36V18a4 4 0 00-4-4H10" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M14 6l-8 8 8 8" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  turnR:'<svg viewBox="0 0 40 40"><path d="M14 36V18a4 4 0 014-4h12" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M26 6l8 8-8 8" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  pinF:'<svg viewBox="0 0 40 40"><path d="M20 37s11-12 11-20a11 11 0 00-22 0c0 8 11 20 11 20z" fill="#fff"/><circle cx="20" cy="17" r="4.5" fill="#188038"/></svg>',
+  hard:'<svg viewBox="0 0 48 48"><path d="M6 32h36v5H6z M10 32c0-10 6-17 14-17s14 7 14 17z" fill="#fff"/><path d="M21 15h6v10h-6z" fill="#FF6B00"/></svg>',
+  shieldBig:'<svg viewBox="0 0 48 48"><path d="M24 5l16 6v12c0 10-7 17-16 20C15 40 8 33 8 23V11z" fill="#fff"/><path d="M17 24l5 5 9-10" fill="none" stroke="#0F1B2D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+
+let S, jobs, timers = [];
+const DAY = 864e5;
+function later(fn, ms){ const t = setTimeout(fn, ms); timers.push(t); return t; }
+function clearTimers(){ timers.forEach(clearTimeout); timers = []; if (S){ if (S.offerTimer) clearInterval(S.offerTimer); if (S.drive) clearInterval(S.drive); } if (window._track){ clearInterval(window._track); window._track = null; } }
+function log(j, text, t = Date.now()){ (j.log = j.log || []).push({t, text}); }
+function reset(){
+  if (S) clearTimers();
+  jobs = JOBS0.map(j => ({...j, utilityTypes:[...j.utilityTypes], log:[]}));
+  const now = Date.now();
+  jobs.forEach((j,i) => {
+    const h = j.priority==='emergency' ? 2 : j.ticketType==='Large project (ALR)' ? 24*12 : 18 + (i*29)%96;
+    j.dueBy = new Date(now + h*36e5).toISOString(); j.workToBeginDate = new Date(now + (h+8)*36e5).toISOString(); j.t = {};
+    log(j, 'Ticket received from Ontario One Call', now - (3 + i%20)*36e5);
+    if (['approved_active','scheduled','en_route','completed_pending_review'].includes(j.status)) log(j, 'Location approved by Enbridge Gas reviewer', now - (2 + i%10)*36e5);
+    if (j.status==='scheduled') log(j, 'Added to Test Technician’s route by dispatch', now - 36e5);
+    if (j.completedDaysAgo){ j.t.completed = now - j.completedDaysAgo*DAY; j.validUntil = j.t.completed + 60*DAY; log(j, `Locate ${j.outcome} and reported to Ontario One Call`, j.t.completed);
+      if (j.continuation==='received') log(j, 'Continuation-to-dig statement received from the excavator', now - 2*DAY); }
+  });
+  const t = jobs.find(j => j.address.startsWith('2100 Bloor'));
+  if (t){ t.status='en_route'; t.assignedTechName='Hannah Liu'; t.techPos={lat:t.lat+0.032,lng:t.lng+0.028}; log(t,'Hannah Liu started the trip', now-9e5); }
+  const r = jobs.find(j => j.status==='completed_pending_review');
+  if (r){ r.photos = [0,1,2].map(i => photo(r.utilityTypes, i+3)); r.arrivedMin = 41; r.outcome = 'marked'; r.offsets = {}; r.utilityTypes.forEach((u,i)=> r.offsets[u] = 2.5 + i*1.7); r.t.completed = now - 2*36e5; r.validUntil = r.t.completed + 60*DAY; log(r,'Locate submitted with 3 photos and sketch', now-2*36e5); }
+  // one delay notice already waiting for the reviewer
+  const dl = jobs.find(j => j.status==='scheduled' && j.address.startsWith('1964'));
+  if (dl){ dl.delay = {newDue: new Date(new Date(dl.dueBy).getTime() + 2*DAY).toISOString(), reason:'Waiting on a gas records request', by:'Owen Baptiste', state:'pending'}; dl.assignedTechName = 'Owen Baptiste'; log(dl,'Notice of delay sent by Owen Baptiste', now - 18e5); }
+  S = {role:null, screen:'start', online:false, consented:false, pos:{...TECH_HOME}, heading:null, homeMode:'route',
+       views:{ tHome:{center:{...TECH_HOME}, ppk:16}, uMap:{center:{lat:43.70,lng:-79.42}, ppk:11} }, follow:true,
+       traffic:false, busy:false, records:true, pref:{emerg:false, radius:25, homeMode:false},
+       stats:{jobs:2, onTime:96, mins:196}, jobId:null, offerTimer:null, offerLeft:30, route:null, routeSeg:0, drive:null,
+       photos:[], check:{}, notes:'', offsets:{}, ref:'curb', signed:false, rating:0, comment:'', tab:0, moved:null, chat:{}, safety:{share:false, checkin:false},
+       fbName:'', feedback:[], incomingSent:false, uView:'list', uType:'All', siteRating:null, offline:false, queue:0, synced: now - 12e4,
+       office:{open:false, type:'All', status:'Open', q:''}};
+  render();
+}
+
+/* ---------- helpers ---------- */
+function km(a,b){ const R=6371, r=x=>x*Math.PI/180, dl=r(b.lat-a.lat), dg=r(b.lng-a.lng);
+  const h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dg/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+const fkm = k => k<1 ? Math.round(k*1000/10)*10+' m' : k.toFixed(1)+' km';
+const tz = {timeZone:'America/Toronto'};
+function fdate(s){ if(!s) return ''; return new Date(s).toLocaleString('en-CA',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',...tz}); }
+const fday = d => d ? new Date(d).toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric',...tz}) : '';
+const ftime = d => d ? new Date(d).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit',...tz}) : '';
+const driveMin = k => Math.max(1, Math.round(k/30*60));
+const job = id => jobs.find(j => j.id===id);
+const myActive = () => jobs.find(j => j.assignedTechName===ME && ['accepted','en_route','on_site'].includes(j.status));
+const certified = j => j.utilityTypes.every(u => CERTS[u]);
+const badge = s => `<span class="badge" style="background:${(STATUS[s]||[s,'#8A94A3'])[1]}">${esc((STATUS[s]||[s])[0])}</span>`;
+const tchip = t => `<span class="tchip" style="color:${TYPES[t]||'#5B6675'};border-color:${TYPES[t]||'#5B6675'}">${esc(t==='Large project (ALR)'?'Large project':t==='Design and Planning'?'Design & Planning':t)}</span>`;
+const uchip = u => `<span class="uchip" style="border-color:${UTIL[u]}"><i style="background:${UTIL[u]}"></i>${u[0].toUpperCase()+u.slice(1)}</span>`;
+const uchips = us => `<div class="uchips">${us.map(uchip).join('')}</div>`;
+const daysLeft = j => j.validUntil ? Math.ceil((j.validUntil - Date.now())/DAY) : null;
+function card(j, {right='', sub='', act='', arg=''}={}){
+  const soon = j.dueBy && (new Date(j.dueBy)-Date.now()) < DAY;
+  return `<button class="card" data-act="${act}" data-arg="${arg||j.id}">
+    <div class="tn"><span>${esc(j.ticketNumber)}</span>${tchip(j.ticketType)}${badge(j.status)}</div>
+    <div class="ad">${esc(j.address)}</div>
+    <div class="sub">${esc(sub || (j.city+' · '+j.workType))}</div>
+    ${uchips(j.utilityTypes)}
+    <div class="due"><span style="color:${soon?'var(--red)':'inherit'}">${j.delay&&j.delay.state==='agreed'?'Renegotiated: ':'Due '}${esc(fdate(j.dueBy))}</span><span>${right}</span></div>
+  </button>`;
+}
+function kv(rows){ return `<dl class="kv">${rows.filter(r=>r[1]).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`; }
+function toast(msg, ms=2900){ const old = $('.toast'); if (old) old.remove(); const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role','status'); t.textContent = msg; app.appendChild(t); later(() => t.remove(), ms); }
+const hdr = (title, sub='', back='', right='') => `<div class="hdr">${back?`<button class="ib" aria-label="Back" data-act="${back}">${ICON.back}</button>`:''}<h2>${esc(title)}${sub?`<small>${esc(sub)}</small>`:''}</h2>${right}</div>`;
+const swipe = (label, act, arg='', cls='') => `<div class="swipe ${cls}" data-swipe="${act}" data-arg="${arg}"><div class="lbl">${label}</div><div class="knob" tabindex="0" role="button" aria-label="${label}. Swipe right or press Enter">»</div></div>`;
+const pinColor = j => j.priority==='emergency' ? {color:'#EA4335', dark:'#B31412'} : j.ticketType==='Priority' ? {color:'#8E24AA', dark:'#5E1675'} : {color:'#FF6B00', dark:'#B33F00'};
+const hist = j => `<ul class="hist">${(j.log||[]).slice().sort((a,b)=>b.t-a.t).map(e=>`<li><time>${fday(e.t)===fday(Date.now())?ftime(e.t):fday(e.t)}</time><span>${esc(e.text)}</span></li>`).join('')}</ul>`;
+// Writes go through here so offline mode can queue them.
+function sync(j, text){ log(j, text); if (S.offline){ S.queue++; } else { S.synced = Date.now(); } }
+const offBanner = () => S.offline ? `<div class="offbanner"><i></i>No signal. Working offline · ${S.queue} update${S.queue===1?'':'s'} waiting to sync</div>` : '';
+
+function photo(us, seed){
+  const rnd = (n => () => (n = (n*9301+49297)%233280)/233280)(seed*97+11);
+  const grass = seed%2===0, base = grass ? '#5E8C3A' : '#6E7276', base2 = grass ? '#78A64C' : '#85898D';
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 220"><rect width="300" height="220" fill="${base}"/>`;
+  for (let i=0;i<40;i++) s += `<circle cx="${rnd()*300}" cy="${rnd()*220}" r="${4+rnd()*14}" fill="${base2}" opacity=".5"/>`;
+  us.forEach((u,i)=>{ const x=40+i*(220/Math.max(1,us.length)), c=UTIL[u];
+    s += `<path d="M${x} 0 C ${x+30*rnd()} 80, ${x-30*rnd()} 140, ${x+20} 220" stroke="${c}" stroke-width="7" fill="none" stroke-dasharray="26 12"/>`;
+    s += `<path d="M${x+14} ${60+rnd()*90} l0 -40 l26 8 l-26 10" fill="${c}" stroke="#222" stroke-width="1.5"/>`; });
+  s += `<rect x="0" y="196" width="300" height="24" fill="#0006"/><text x="10" y="213" font-family="Roboto,Arial" font-size="13" fill="#fff">LocateGo · ${new Date().toLocaleDateString('en-CA')}</text></svg>`;
+  return 'data:image/svg+xml;utf8,'+encodeURIComponent(s);
+}
+// Utility records ("as-builts") drawn near the site: mains along the street, services into the lot.
+function recordsFor(j){
+  const out = [], perp = 1/(111.32), along = 1/(111.32*Math.cos(j.lat*Math.PI/180));
+  const offs = {gas:-0.012, water:-0.016, sewer:-0.020, hydro:0.010, telecom:0.014, fibre:0.017};
+  j.utilityTypes.forEach(u => {
+    const o = offs[u] ?? 0, mid = {lat: j.lat + o*perp, lng: j.lng};
+    const a = {lat: mid.lat + SE*(-0.08*along)*0 - 0.0, lng: mid.lng - 0.08*along}, b = {lat: mid.lat, lng: mid.lng + 0.08*along};
+    a.lat = mid.lat + SE*(a.lng - mid.lng); b.lat = mid.lat + SE*(b.lng - mid.lng);
+    out.push({color: UTIL[u], pts:[a,b], label: u[0].toUpperCase()+u.slice(1)+' main'});
+    if (u==='gas' || u==='water') out.push({color: UTIL[u], pts:[{lat:mid.lat, lng:j.lng+0.004*along*(u==='gas'?1:-1)}, {lat:j.lat, lng:j.lng+0.004*along*(u==='gas'?1:-1)}]});
+  });
+  return out;
+}
+
+/* ---------- routing ---------- */
+function makeRoute(from, to){
+  const ew = nearestRoadObj(from, false), ns = nearestRoadObj(to, true);
+  const p1 = ew ? {lat: ewLat(ew, from.lng), lng: from.lng} : {...from};
+  const p3 = ns ? {lat: to.lat, lng: nsLng(ns, to.lat)} : {lat: to.lat, lng: to.lng};
+  const corner = gridCorner(p1, p3);
+  const pts = [{...from}, p1, corner, p3, {lat:to.lat, lng:to.lng}];
+  const names = ['', ew ? ew.n : 'the local road', ns ? ns.n : 'the local road', 'the site entrance'];
+  const route = [pts[0]], segNames = [];
+  for (let i=1;i<pts.length;i++){ if (km(route[route.length-1], pts[i]) > 0.02){ route.push(pts[i]); segNames.push(names[i-1] || names[i]); } }
+  if (route.length === 1) route.push({lat:to.lat, lng:to.lng}), segNames.push('the site entrance');
+  route.names = segNames;
+  return route;
+}
+function routeLeft(){ if (!S.route) return 0; let d = km(S.pos, S.route[S.routeSeg+1]); for (let i=S.routeSeg+1;i<S.route.length-1;i++) d += km(S.route[i], S.route[i+1]); return d; }
+function bearing(a,b){ const y = (b.lng-a.lng)*Math.cos(a.lat*Math.PI/180), x = b.lat-a.lat; return Math.atan2(y, x)*180/Math.PI; }
+function turnDir(a, b, c){ const k = Math.cos(a.lat*Math.PI/180); const x1 = (b.lng-a.lng)*k, y1 = b.lat-a.lat, x2 = (c.lng-b.lng)*k, y2 = c.lat-b.lat; return (x1*y2 - y1*x2) > 0 ? 'left' : 'right'; }
+function navStep(){
+  const r = S.route, j = job(S.jobId), i = S.routeSeg; if (!r) return null;
+  const toDest = km(S.pos, j), last = r.length - 2;
+  let k = i + 1;
+  while (k <= last && km(r[k], r[k+1]) < 0.06) k++;
+  if (k > last || toDest < 0.2) return {icon: ICON.pinF, dist: toDest, text: toDest < 0.2 ? 'Arrive at the dig site' : 'Continue to the dig site', then: `${j.address}, on your ${hashStr(j.id)%2 ? 'right' : 'left'}`};
+  const dir = turnDir(r[k-1], r[k], r[k+1]), road = r.names[k] || 'the local road';
+  let then = `Then destination on ${r.names[r.length-2] || road}`;
+  for (let m = k+1; m <= last; m++){ if (km(r[m], r[m+1]) >= 0.06){ then = `Then turn ${turnDir(r[m-1], r[m], r[m+1])} onto ${r.names[m]}`; break; } }
+  if (then.includes('the site entrance')) then = `Then destination on your ${hashStr(j.id)%2 ? 'right' : 'left'}`;
+  let dist = km(S.pos, r[i+1]); for (let m=i+1;m<k;m++) dist += km(r[m], r[m+1]);
+  return {icon: dir==='left' ? ICON.turnL : ICON.turnR, dist, text: road==='the site entrance' ? `Turn ${dir} to the dig site` : `Turn ${dir} onto ${road}`, then};
+}
+// Day route: nearest-next order, emergencies first, with planned arrival times.
+function dayRoute(){
+  let left = jobs.filter(j => j.assignedTechName===ME && j.status==='scheduled');
+  const order = []; let at = {...S.pos}, clock = Date.now();
+  const active = myActive(); if (active){ at = {lat:active.lat, lng:active.lng}; clock += 40*6e4; }
+  while (left.length){
+    left.sort((a,b) => (b.priority==='emergency') - (a.priority==='emergency') || km(at,a) - km(at,b));
+    const n = left.shift(), d = km(at, n); clock += driveMin(d)*6e4;
+    order.push({j:n, eta: clock, drive: d}); clock += (25 + n.utilityTypes.length*6)*6e4; at = n;
+  }
+  return {order, end: clock};
+}
+
+/* ---------- maps ---------- */
+let MAPS = {};
+function mapEl(id, optsFn, style=''){ MAPS[id] = optsFn; return `<div class="mapbox" id="${id}" style="${style}"></div>`; }
+function drawMap(id){ const el = document.getElementById(id), fn = MAPS[id]; if (!el || !fn) return; const o = fn(); el.innerHTML = mapSvg({...o, w: el.clientWidth || 390, h: el.clientHeight || 300}); }
+function drawMaps(){ Object.keys(MAPS).forEach(drawMap); }
+let raf = 0; function redraw(id){ if (raf) return; raf = requestAnimationFrame(() => { raf = 0; drawMap(id); }); }
+function bindPan(id, view){
+  const el = document.getElementById(id); if (!el) return;
+  const pts = new Map(); let moved = 0, start = null;
+  const kx = () => 111.32*Math.cos(view.center.lat*Math.PI/180)*view.ppk, ky = () => 111.32*view.ppk;
+  el.addEventListener('pointerdown', e => { pts.set(e.pointerId, {x:e.clientX, y:e.clientY}); moved = 0; el.setPointerCapture(e.pointerId);
+    if (pts.size === 2){ const [a,b] = [...pts.values()]; start = {d: Math.hypot(a.x-b.x, a.y-b.y), ppk: view.ppk}; } });
+  el.addEventListener('pointermove', e => { const p = pts.get(e.pointerId); if (!p) return;
+    if (pts.size === 1){ const dx = e.clientX-p.x, dy = e.clientY-p.y; moved += Math.abs(dx)+Math.abs(dy);
+      view.center = {lat: view.center.lat + dy/ky(), lng: view.center.lng - dx/kx()}; if (moved > 6) S.follow = false; }
+    p.x = e.clientX; p.y = e.clientY;
+    if (pts.size === 2 && start){ const [a,b] = [...pts.values()]; view.ppk = Math.max(6, Math.min(4000, start.ppk * Math.hypot(a.x-b.x, a.y-b.y)/start.d)); moved += 10; }
+    redraw(id); });
+  const end = e => { pts.delete(e.pointerId); if (pts.size < 2) start = null; };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  el.addEventListener('click', e => { if (moved > 6){ e.stopPropagation(); e.preventDefault(); } }, true);
+  el.addEventListener('wheel', e => { e.preventDefault(); view.ppk = Math.max(6, Math.min(4000, view.ppk * (e.deltaY < 0 ? 1.15 : 1/1.15))); redraw(id); }, {passive:false});
+}
+
+/* ---------- screens ---------- */
+// Open requests: emergency and priority tickets come as offers; standard ones can be added to the route.
+function nearby(){
+  if (!S.online) return [];
+  const P = S.pref;
+  return jobs.filter(j => j.status==='approved_active' && km(S.pos,j) <= P.radius && certified(j)
+      && (!P.emerg || j.priority==='emergency') && (!P.homeMode || onTheWay(j)))
+    .sort((a,b) => (a.priority==='emergency'?0:1)-(b.priority==='emergency'?0:1) || km(S.pos,a)-km(S.pos,b));
+}
+function onTheWay(j){
+  const A = S.pos, B = HOME_BASE, kx = 80.5, ky = 111.3;
+  const ax = (B.lng-A.lng)*kx, ay = (B.lat-A.lat)*ky, px = (j.lng-A.lng)*kx, py = (j.lat-A.lat)*ky;
+  const t = Math.max(0, Math.min(1, (px*ax+py*ay)/(ax*ax+ay*ay))); return Math.hypot(px-t*ax, py-t*ay) <= 3;
+}
+const SCREENS = {
+start(){
+  return `<div class="start">
+    <div style="display:flex;align-items:center;gap:10px"><svg width="40" height="40" viewBox="0 0 24 24"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z" fill="#FF6B00"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg><b style="font-size:24px">LocateGo</b></div>
+    <h1>Who are you testing as?</h1>
+    <p class="muted" style="margin:0">Pick a role. You can switch at any time.</p>
+    <button class="rolecard" style="background:#FF6B00" data-act="role" data-arg="tech">${ICON.hard}<div><b>Locate technician</b><span>Work your day route, take emergency calls, deliver locate documents</span></div></button>
+    <button class="rolecard" style="background:#0F1B2D" data-act="role" data-arg="uio">${ICON.shieldBig}<div><b>Utility reviewer</b><span>Approve or clear tickets, track technicians, stay compliant with Ontario One Call</span></div></button>
+    <p class="small" style="margin:6px 0 0">Prototype. Tickets, people and companies are made up. Tap <b>Feedback</b> on any screen to tell us what to change.</p>
+  </div>`;
+},
+/* ----- technician ----- */
+tHome(){
+  const near = nearby(), active = myActive(), v = S.views.tHome, dr = dayRoute();
+  if (S.follow) v.center = {...S.pos};
+  const routeMode = S.homeMode === 'route';
+  const map = mapEl('m-home', () => {
+    const r = dayRoute();
+    let line = null;
+    if (routeMode && r.order.length){ line = []; let at = active ? {lat:active.lat,lng:active.lng} : S.pos; for (const st of r.order){ line.push(...makeRoute(at, st.j)); at = st.j; } }
+    return {center:v.center, ppk:v.ppk, tech:S.pos, heading:S.heading, traffic:S.traffic, route: line,
+      pins: routeMode ? r.order.map((st,i) => ({id:st.j.id, lat:st.j.lat, lng:st.j.lng, act:'openActive', badge:String(i+1), color: i===0?'#FF6B00':'#5E35B1', dark: i===0?'#B33F00':'#3B1F7A'}))
+                      : nearby().map(j => ({id:j.id, lat:j.lat, lng:j.lng, act:'offer', ...pinColor(j)})),
+      circle: (!routeMode && S.online) ? {...S.pos, km:S.pref.radius} : null,
+      heat: S.busy ? jobs.filter(j=>['approved_active','uio_review'].includes(j.status)) : null}; }, 'position:absolute;inset:0');
+  const hrs = Math.max(0, (dr.end - Date.now())/36e5);
+  return map + `
+  <div class="top ${S.online?'on':''}">
+    <div class="who"><b>Hi Test</b><span style="color:${S.online?'var(--green)':'var(--g)'}">${S.online?(S.offline?'Online · offline mode':'Online · on shift'):'Off shift'}</span></div>
+    <button class="sw ${S.online?'on':''}" role="switch" aria-checked="${S.online}" aria-label="Start shift" data-act="toggleOnline"></button>
+    <button class="ib" aria-label="Menu" data-act="go" data-arg="tJobs">${ICON.menu}</button>
+  </div>
+  <div class="pills">
+    <div class="modeseg"><button class="${routeMode?'on':''}" data-act="homeMode" data-arg="route">My route</button><button class="${routeMode?'':'on'}" data-act="homeMode" data-arg="open">Open requests</button></div>
+    <button class="pill dark" data-act="today">Today · ${S.stats.jobs} done</button>
+    ${routeMode?'':`<button class="pill ${S.pref.emerg||S.pref.homeMode||S.pref.radius!==25?'on':''}" data-act="prefs">${ICON.sliders} Preferences</button>`}
+    <button class="pill ${S.busy?'on':''}" data-act="busy">Busy areas</button>
+    <button class="pill ${S.traffic?'on':''}" data-act="traffic">Traffic</button>
+  </div>
+  ${S.offline?`<div style="position:absolute;left:10px;right:10px;top:128px;z-index:5;border-radius:10px;overflow:hidden">${offBanner()}</div>`:''}
+  ${active?`<button class="activebar" style="top:${S.offline?166:130}px" data-act="openActive" data-arg="${active.id}"><div style="flex:1"><b>Active job: ${esc(active.address)}</b>${esc(STATUS[active.status][0])}</div>›</button>`:''}
+  <div class="fabs" style="bottom:${routeMode?306:276}px">
+    <button class="fab" aria-label="Safety toolkit" data-act="safety">${ICON.shield}</button>
+    <button class="fab ${S.follow?'on':''}" aria-label="Re-centre on me" data-act="recenter">${ICON.target}</button>
+  </div>
+  <div class="panel" style="height:${routeMode?292:262}px">
+  ${routeMode ? `
+    <div class="ph"><b>My route today</b><span class="muted">${dr.order.length} stops · done about ${ftime(dr.end)}</span></div>
+    ${!S.online ? `<div class="empty"><div><b style="color:var(--n)">You're off shift.</b><br>Start your shift to begin your route.<br><span style="font-size:13px">Dispatch planned ${dr.order.length} stops, about ${hrs.toFixed(1)} h.</span></div></div>`
+    : dr.order.length===0 ? `<div class="empty">Route finished. Switch to Open requests to pick up more work.</div>`
+    : `<div class="stops">${dr.order.map((st,i)=>`<button class="stop ${i===0?'next':''}" data-act="openActive" data-arg="${st.j.id}"><span class="n">${i+1}</span><div style="min-width:0;flex:1"><b>${esc(st.j.address)}</b><span>${esc(st.j.workType)} · ${fkm(st.drive)}${st.j.ticketType!=='Standard'?' · '+esc(st.j.ticketType):''}</span></div><time>${ftime(st.eta)}</time></button>`).join('')}</div>
+       <div style="padding:8px 14px 12px">${active?`<button class="btn sm" data-act="openActive" data-arg="${active.id}">Back to active job</button>`:`<button class="btn sm" data-act="openActive" data-arg="${dr.order[0].j.id}">Go to stop 1 · ${esc(dr.order[0].j.address)}</button>`}</div>`}
+  ` : `
+    <div class="ph"><b>${S.pref.homeMode?'Open requests on my way home':'Open requests near you'}</b><span class="muted">${S.online?`${near.length} within ${S.pref.radius} km`:''}</span></div>
+    ${!S.online ? `<div class="empty"><div><b style="color:var(--n)">You're off shift.</b><br>Start your shift to see open requests.</div></div>`
+      : near.length===0 ? `<div class="empty">No open requests you're certified for right now.</div>`
+      : `<div class="hlist">${near.map(j=>card(j,{act:'offer', right:`<b>${fkm(km(S.pos,j))} · ${driveMin(km(S.pos,j))} min</b>`})).join('')}</div>`}
+  `}
+  </div>`;
+},
+tActive(){
+  const j = job(S.jobId), d = km(S.pos, j);
+  let foot;
+  if (j.status==='scheduled' || j.status==='accepted') foot = swipe('Swipe to start trip','startTrip',j.id,'navy') + `<div class="helper">Starts navigation and shares your location with the utility.</div>`;
+  else if (j.status==='en_route') foot = `<button class="btn ghost sm" style="margin-bottom:8px" data-act="go" data-arg="tNav">${ICON.nav} Resume navigation · ${fkm(d)}</button>` + swipe("Swipe when you've arrived",'arrive',j.id,'green') + `<div class="helper">Unlocks within 150 m of the dig site.</div>`;
+  else if (j.status==='on_site') foot = swipe('Swipe to complete locate','goComplete',j.id) + `<div class="helper">Photos, utility results, sketch, then the locate document.</div>`;
+  else foot = `<div class="grey" style="text-align:center;font-weight:600">${j.status==='completed_pending_review'?'Locate document sent. Waiting for the utility to review.':'Status: '+esc((STATUS[j.status]||[j.status])[0])}</div>`;
+  const unread = (S.chat[j.id]||[]).filter(m=>m.them && !m.read).length;
+  const mine = ['scheduled','accepted','en_route','on_site'].includes(j.status);
+  return hdr(j.ticketNumber, STATUS[j.status]?STATUS[j.status][0]:'', 'go:tHome', `<button class="ib" aria-label="Safety toolkit" data-act="safety">${ICON.shield}</button>${mine?`<button class="ib" aria-label="More options" data-act="jobMenu">${ICON.dots}</button>`:''}`) + offBanner() +
+  `<div style="position:relative;height:220px;flex:none">` + mapEl('m-active', () => ({center:{lat:j.lat,lng:j.lng}, ppk:2200, pins:[{id:j.id,lat:j.lat,lng:j.lng,...pinColor(j)}], poly:j.digAreaPolygon, circle:{lat:j.lat,lng:j.lng,km:0.15}, tech: d<0.5?S.pos:null, heading:S.heading, records: S.records ? recordsFor(j) : null}), 'position:absolute;inset:0') +
+  `<div class="maplabel">${d<0.15?'You are on site':'You are '+fkm(d)+' away · '+driveMin(d)+' min'}</div>
+   <button class="maplabel" style="left:auto;right:10px;top:auto;bottom:10px;display:flex;gap:6px;align-items:center;${S.records?'background:#E8F0FE;color:#1A73E8':''}" data-act="records">${ICON.layers.replace('width="24" height="24"','width="16" height="16"')} Utility records</button></div>
+  <div class="body">
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">${tchip(j.ticketType)}${j.delay?`<span class="tchip" style="color:#7A4F01;border-color:#F29900">${j.delay.state==='agreed'?'Renegotiated':'Delay notice sent'}</span>`:''}</div>
+    <div class="big">${esc(j.address)}</div>
+    <div class="muted">${esc(j.city)} · ${esc(j.nearestIntersection)}</div>
+    <div class="btns" style="margin-top:12px"><button class="btn navy sm" data-act="${['scheduled','accepted'].includes(j.status)?'startTrip':'go'}" data-arg="${['scheduled','accepted'].includes(j.status)?j.id:'tNav'}">${ICON.nav} Navigate</button><button class="btn alt sm" data-act="ext" data-arg="Waze">Waze</button><button class="btn alt sm" data-act="ext" data-arg="Google Maps">Google</button></div>
+    <div class="btns" style="margin-top:6px"><button class="btn alt sm" style="border:0" data-act="ext" data-arg="the phone dialler">${ICON.phone} Call</button><button class="btn alt sm" style="border:0" data-act="chatOpen">${ICON.chat} Message${unread?` <span class="badge" style="background:var(--red)">${unread}</span>`:''}</button><button class="btn alt sm" style="border:0" data-act="issue">${ICON.flag} Issue</button></div>
+    ${S.records?`<div class="note info">Dashed lines are the utility's records. Records can be wrong: always confirm with your locating equipment.</div>`:''}
+    ${uchips(j.utilityTypes)}
+    ${kv([['Work',j.workType],['Description',j.workDescription],['Requester',j.requesterName+' · '+j.requesterCompany],['Due',fdate(j.dueBy)],['Members',j.membersNotified.join(', ')]])}
+    <div class="sec" style="margin-top:6px">Locate area</div><div class="grey">${esc(j.locateAreaInstructions)}</div>
+    <div class="sec">History</div>${hist(j)}
+  </div><div class="foot">${foot}</div>`;
+},
+tNav(){
+  const j = job(S.jobId), st = navStep(), left = routeLeft(), mins = driveMin(left);
+  const arrive = new Date(Date.now() + mins*6e4), near = km(S.pos, j) <= 0.15;
+  return mapEl('m-nav', () => ({center:{lat:S.pos.lat + 90/(111.32*160), lng:S.pos.lng}, ppk:160, tech:S.pos, heading:S.heading, traffic:true,
+      route:[S.pos, ...S.route.slice(S.routeSeg+1)], pins:[{id:j.id,lat:j.lat,lng:j.lng,...pinColor(j)}]}), 'position:absolute;inset:0') + `
+  <div class="navban">${st.icon}<div style="flex:1"><span>${st.dist<0.05?'Now':fkm(st.dist)}</span><b>${esc(st.text)}</b></div></div>
+  <div class="navthen">${esc(st.then)}</div>
+  <div class="fabs" style="bottom:${near?232:200}px"><button class="fab" aria-label="Safety toolkit" data-act="safety">${ICON.shield}</button></div>
+  <div class="navbot">
+    <div class="eta"><b>${mins} min</b><span>${fkm(left)} · arrive ${ftime(arrive)}</span><span style="flex:1"></span><button class="btn alt sm" style="width:auto;padding:0 14px;min-height:40px" data-act="go" data-arg="tActive">Details</button></div>
+    <div class="muted" style="font-size:13.5px;margin:2px 0 10px">${esc(j.address)} · ${esc(j.workType)}</div>
+    ${near ? swipe("Swipe when you've arrived",'arrive',j.id,'green') : `<div class="btns"><button class="btn ghost sm" data-act="simDrive">Prototype: simulate the drive</button></div>`}
+  </div>`;
+},
+tComplete(){
+  const j = job(S.jobId), need = 3 - S.photos.length;
+  const ready = need<=0 && j.utilityTypes.every(u=>S.check[u]) && S.notes.trim().length>=5;
+  return hdr('Complete locate', 'Step 1 of 3 · Photos and results', 'go:tActive') + offBanner() + `<div class="body">
+    <div class="sec" style="margin-top:4px">Photos</div>
+    <div style="font-weight:700;color:${need>0?'var(--o)':'var(--green)'}">${need>0?S.photos.length+' of 3 required':S.photos.length+' photos added'}</div>
+    <div class="btns" style="margin-top:8px"><button class="btn alt sm" data-act="addPhoto">${ICON.cam} Camera</button><button class="btn alt sm" data-act="addPhoto">Gallery</button></div>
+    <div class="photos">${S.photos.map((p,i)=>`<div class="ph"><img src="${p}" alt="Site photo ${i+1}"><button class="x" data-act="rmPhoto" data-arg="${i}" aria-label="Remove photo">×</button></div>`).join('')}</div>
+    <div class="sec">Result for each utility</div>
+    <div class="muted" style="font-size:13.5px;margin-bottom:6px"><b>Located</b> = marked in paint and flags. <b>Clear</b> = no plant in the dig area.</div>
+    ${j.utilityTypes.map(u=>`<div>${uchip(u)}<div class="choice">${['Located','Clear','N/A'].map(a=>`<button class="${S.check[u]===a?'on':''}" data-act="check" data-arg="${u}|${a}">${a}</button>`).join('')}</div></div>`).join('')}
+    <div class="sec">Notes</div>
+    <textarea id="notes" rows="4" placeholder="What you marked, offsets, and anything the excavator should know">${esc(S.notes)}</textarea>
+  </div>
+  <div class="foot"><button class="btn ${ready?'':'dim'}" data-act="toSketch">Next: locate sketch</button></div>`;
+},
+tSketch(){
+  const j = job(S.jobId), located = j.utilityTypes.filter(u => S.check[u]==='Located');
+  located.forEach((u,i) => { if (S.offsets[u] == null) S.offsets[u] = +(2 + i*1.5).toFixed(1); });
+  return hdr('Locate sketch', 'Step 2 of 3 · Measure from a fixed point', 'go:tComplete') + offBanner() + `<div class="body">
+    <div class="sec" style="margin-top:2px">Measured from</div>
+    <div class="choice">${[['curb','Curb'],['building','Building face'],['property','Property line']].map(([k,l])=>`<button class="${S.ref===k?'on':''}" data-act="ref" data-arg="${k}">${l}</button>`).join('')}</div>
+    ${sketchSvg(j, located)}
+    ${located.length ? `<div class="sec">Distance from the ${S.ref==='curb'?'curb':S.ref==='building'?'building face':'property line'}</div>
+      ${located.map(u=>`<div class="offrow"><b style="display:flex;gap:6px;align-items:center"><i style="width:10px;height:10px;border-radius:50%;background:${UTIL[u]};display:block"></i>${u[0].toUpperCase()+u.slice(1)}</b><input type="range" min="0.5" max="15" step="0.1" value="${S.offsets[u]}" data-off="${u}" aria-label="${u} offset in metres"><output id="o-${u}">${S.offsets[u].toFixed(1)} m</output></div>`).join('')}`
+      : `<div class="note ok">Every utility is Clear or N/A, so this locate is a <b>clearance</b>. No marks to measure.</div>`}
+    <div class="note warn">Marks show horizontal position only. Depth is never guaranteed.</div>
+  </div>
+  <div class="foot"><button class="btn" data-act="toDoc">Next: preview locate document</button></div>`;
+},
+tDoc(){
+  const j = job(S.jobId), ro = S.role==='uio';
+  return hdr('Locate document', ro ? j.ticketNumber : 'Step 3 of 3 · Check, sign and send', ro ? 'go:uRate' : 'go:tSketch') + (ro?'':offBanner()) + `<div class="body" style="background:var(--p)">${docHtml(j, ro)}</div>
+  ${ro ? '' : `<div class="foot">${S.signed ? swipe('Swipe to send to the excavator','submitDoc',j.id) : `<button class="btn dim" data-act="sign">Sign the document first</button>`}<div class="helper">Sends the document by email and text, and reports the status to Ontario One Call.</div></div>`}`;
+},
+tSummary(){
+  const j = job(S.jobId), t = j.t;
+  const mins = (a,b) => a&&b ? Math.max(1, Math.round((b-a)/6e4)) : '–';
+  const next = dayRoute().order[0];
+  return hdr('Job complete', j.ticketNumber, '') + `<div class="body">
+    <div style="text-align:center;padding:6px 0 10px"><svg width="64" height="64" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1F9D55"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="big" style="margin-top:6px">${j.outcome==='cleared'?'Clearance sent':'Locate document sent'}</div><div class="muted">${esc(j.address)}, ${esc(j.city)}</div></div>
+    ${S.offline ? `<div class="note warn">You're offline. The document and status will send as soon as you have signal (${S.queue} waiting).</div>` : `<div class="note ok">Sent to ${esc(j.requesterName)} by email and text. Status <b>${j.outcome==='cleared'?'Cleared':'Marked'}</b> reported to Ontario One Call.</div>`}
+    <div class="facts"><div><b>${mins(t.started,t.arrived)} min</b><span>Drive</span></div><div><b>${mins(t.arrived,t.completed)} min</b><span>On site</span></div><div><b>${fday(j.validUntil)}</b><span>Valid until</span></div></div>
+    <div class="sec">Was the ticket information accurate?</div>
+    <div class="btns"><button class="btn ${S.siteRating==='up'?'':'alt'} sm" data-act="siteRate" data-arg="up">Yes, accurate</button><button class="btn ${S.siteRating==='down'?'':'alt'} sm" data-act="siteRate" data-arg="down">No, something was off</button></div>
+    <div class="sec">History</div>${hist(j)}
+  </div>
+  <div class="foot"><button class="btn" data-act="backToMap">${next?`Next stop: ${esc(next.j.address)}`:'Back to the map'}</button></div>`;
+},
+tJobs(){
+  const mine = jobs.filter(j => j.assignedTechName===ME);
+  const groups = [['Today',null],['Route',['scheduled','accepted','en_route','on_site']],['Done',['completed_pending_review','uio_approved']],['Disputed',['disputed']]];
+  let body;
+  if (S.tab===0){
+    const week = [14,17,15,18,12,0,S.stats.jobs], days = ['Mon','Tue','Wed','Thu','Fri','Sat','Today'], mx = Math.max(...week,1);
+    body = `<div class="stat3"><div><b>${S.stats.jobs}</b><span>Locates done today</span></div><div><b>${(S.stats.mins/60).toFixed(1)} h</b><span>On shift today</span></div><div><b>${S.stats.onTime}%</b><span>Done by the due date</span></div><div><b>4.8★</b><span>Utility rating, last 50</span></div></div>
+      <div class="sec">This week</div><div class="bars">${week.map((v,i)=>`<div class="${i===6?'today':''}"><b style="color:var(--n)">${v}</b><i style="height:${Math.max(4,v/mx*80)}px"></i>${days[i]}</div>`).join('')}</div>
+      <div class="sec">Certifications</div>
+      <div>${Object.keys(CERTS).map(u=>`<span class="cert ${CERTS[u]?'ok':'no'}">${CERTS[u]?'✓':''} ${u[0].toUpperCase()+u.slice(1)}</span>`).join('')}</div>
+      <div class="muted" style="font-size:13.5px">Authorized for Enbridge Gas, Toronto Hydro, Bell Canada and City of Toronto Water through GreenFlag Locates. Tickets with fibre aren't offered to you until your admin adds that certification.</div>
+      <div class="sec">Latest comments from utilities</div>
+      <div class="grey" style="margin-bottom:8px"><b>5★</b> Clear marks, photos matched the paint on site.</div><div class="grey"><b>4★</b> Good notes. Done well before the due date.</div>
+      <div class="sec">Settings</div>
+      <div class="toggle"><div><b>Simulate no signal</b><span>Prototype only: see how offline mode works</span></div><button class="switch ${S.offline?'on':''}" role="switch" aria-checked="${S.offline}" aria-label="Simulate no signal" data-act="offline"></button></div>
+      <div class="toggle"><div><b>Location tracking policy</b><span>${S.consented?'Agreed today. Tracking only while you are on shift.':'Not agreed yet'}</span></div><button class="btn alt sm" style="width:auto;padding:0 12px" data-act="policy">View</button></div>`;
+  } else {
+    const list = mine.filter(j => groups[S.tab][1].includes(j.status));
+    body = list.length ? list.map(j=>card(j,{act:'openActive'})).join('') : '<div class="empty" style="padding:40px 20px">Nothing here yet.</div>';
+  }
+  return hdr('My work','Test Technician · GreenFlag Locates', 'go:tHome', `<button class="ib" aria-label="Log out" data-act="role" data-arg="">${ICON.out}</button>`) + offBanner() +
+  `<div class="tabs">${groups.map((g,i)=>`<button class="${S.tab===i?'on':''}" data-act="tab" data-arg="${i}">${g[0]}</button>`).join('')}</div><div class="body">${body}</div>`;
+},
+/* ----- utility reviewer ----- */
+uDash(){
+  const T = S.uType, typeOk = j => T==='All' || j.ticketType===T;
+  const by = st => jobs.filter(j => st.includes(j.status) && typeOk(j)).sort((a,b)=>new Date(a.dueBy)-new Date(b.dueBy));
+  const pend=by(['uio_review']), act=by(['approved_active','scheduled']), mov=by(['accepted','en_route','on_site']), rev=by(['completed_pending_review']);
+  const delays = jobs.filter(j => j.delay && j.delay.state==='pending' && ['scheduled','accepted','en_route','on_site','approved_active'].includes(j.status));
+  const expiring = jobs.filter(j => j.validUntil && daysLeft(j) <= 20 && daysLeft(j) > 0).sort((a,b)=>a.validUntil-b.validUntil);
+  const open = jobs.filter(j => ['uio_review','approved_active','scheduled','accepted','en_route','on_site'].includes(j.status));
+  const dueToday = open.filter(j => new Date(j.dueBy) - Date.now() < DAY).length;
+  const seg = `<div class="seg"><button class="${S.uView==='list'?'on':''}" data-act="uView" data-arg="list">List</button><button class="${S.uView==='map'?'on':''}" data-act="uView" data-arg="map">Map</button></div>`;
+  const head = hdr('Locate requests','Enbridge Gas · Toronto region','', seg + `<button class="ib" aria-label="Office dashboard" data-act="officeOpen">${ICON.desk}</button><button class="ib" aria-label="Log out" data-act="role" data-arg="">${ICON.out}</button>`);
+  if (S.uView === 'map'){
+    const v = S.views.uMap;
+    const actFor = j => j.status==='uio_review'?'review': j.status==='completed_pending_review'?'rate': ['accepted','en_route','on_site'].includes(j.status)?'track':'';
+    return head + `<div style="position:relative;flex:1">` + mapEl('m-uio', () => ({center:v.center, ppk:v.ppk, traffic:S.traffic,
+        pins: jobs.filter(j=>STATUS[j.status] && !['rejected','uio_approved','cleared'].includes(j.status) && typeOk(j)).map(j => ({id:j.id, lat:j.lat, lng:j.lng, act:actFor(j), color:STATUS[j.status][1], dark:'#0F1B2D99'})),
+        cars: jobs.filter(j=>['en_route','on_site'].includes(j.status)).map(j => ({...(j.techPos || (j.assignedTechName===ME ? S.pos : j)), label:(j.assignedTechName||'').split(' ')[0]}))}), 'position:absolute;inset:0') +
+      `<div class="pills" style="top:10px">${[['UIO review','#5B7FA6',pend.length],['Waiting','#FF6B00',act.length],['In progress','#1565D8',mov.length],['To review','#C2185B',rev.length]].map(([l,c,n])=>`<span class="pill"><i style="width:10px;height:10px;border-radius:50%;background:${c};display:block"></i>${l} ${n}</span>`).join('')}<button class="pill ${S.traffic?'on':''}" data-act="traffic">Traffic</button></div>
+      <div class="techcard" style="padding:10px 14px"><b>Tap a pin</b><div class="muted" style="font-size:13.5px">Grey-blue to review a ticket, blue to track a technician, pink to rate finished work.</div></div></div>`;
+  }
+  const none = t => `<div class="muted" style="margin-bottom:6px">${t}</div>`;
+  return head + `<div class="body">
+    <div class="comp"><div><b>94%</b><span>On time this month</span></div><div><b style="color:${dueToday?'var(--red)':'inherit'}">${dueToday}</b><span>Due in the next 24 h</span></div><div><b>${pend.length}</b><span>Waiting for your approval</span></div><div><b>${rev.length}</b><span>Waiting for your rating</span></div></div>
+    <div class="sync"><i></i>Statuses synced with Ontario One Call 360 Feedback · ${Math.max(1, Math.round((Date.now()-S.synced)/6e4))} min ago</div>
+    <div class="chiprow">${['All','Emergency','Priority','Standard','Remark','Design and Planning','Large project (ALR)'].map(t=>`<button class="${S.uType===t?'on':''}" data-act="uType" data-arg="${t}">${t==='Large project (ALR)'?'Large project':t==='Design and Planning'?'Design & Planning':t}</button>`).join('')}</div>
+    ${delays.length?`<div class="sec">Delay notices</div>${delays.map(j=>card(j,{act:'delayView',sub:`${j.delay.by}: ${j.delay.reason}`,right:`<span class="badge" style="background:#F29900">New date ${fday(j.delay.newDue)}</span>`})).join('')}`:''}
+    <div class="sec">Needs your approval</div>${pend.length?pend.map(j=>card(j,{act:'review',right:'›'})).join(''):none('Nothing waiting.')}
+    <div class="sec">Ready for your review</div>${rev.length?rev.map(j=>card(j,{act:'rate',sub:'Technician: '+j.assignedTechName,right:'<span class="badge" style="background:#FF6B00">Review</span>'})).join(''):none('No finished locates to review.')}
+    <div class="sec">Technicians on the way or on site</div>${mov.length?mov.map(j=>card(j,{act:'track',sub:'Technician: '+j.assignedTechName,right:'Track ›'})).join(''):none('No jobs in progress.')}
+    <div class="sec">Locates expiring soon</div>
+    ${expiring.length?expiring.map(j=>{ const dl = daysLeft(j), win = dl<=15 && dl>=10, st = j.continuation==='received';
+      return card(j,{act:'expView', sub:`${j.outcome==='cleared'?'Cleared':'Marked'} ${fday(j.t.completed)} · ${st?'Continuation statement received':win?'Continuation window open now':dl<10?'No continuation statement, re-locate likely':'Continuation window opens in '+(dl-15)+' days'}`, right:`<span class="badge" style="background:${dl<=10?'#D42B2B':'#F29900'}">${dl} days left</span>`}); }).join(''):none('Nothing expiring in the next 20 days.')}
+    <div class="sec">Dedicated Locator projects</div>
+    <button class="card" data-act="dlView"><div class="tn"><span>DL-2026-0417</span>${tchip('Large project (ALR)')}</div><div class="ad">Eglinton West fibre build</div><div class="sub">GreenFlag Locates (DLSP) · 14 tickets · 10 business days each</div><div class="prog"><i style="width:64%"></i></div><div class="due"><span>9 of 14 complete</span><span>›</span></div></button>
+    <div class="sec">Waiting for a technician</div>${act.length?act.map(j=>card(j,{sub: j.status==='scheduled' ? 'On '+j.assignedTechName+'’s route today' : undefined})).join(''):none('No approved jobs waiting.')}
+  </div>`;
+},
+uReview(){
+  const j = job(S.jobId), dp = j.ticketType==='Design and Planning', big = j.ticketType==='Large project (ALR)';
+  return hdr(j.ticketNumber, dp ? 'Design & Planning request' : 'Approve the locate location','go:uDash') +
+  `<div style="position:relative;height:250px;flex:none">${mapEl('m-review', () => ({center:{lat:j.lat,lng:j.lng}, ppk:2600, records: recordsFor(j), pins:[{id:'drag',lat:(S.moved||j).lat,lng:(S.moved||j).lng}], poly: S.moved ? j.digAreaPolygon.map(p=>({lat:p.lat+S.moved.lat-j.lat,lng:p.lng+S.moved.lng-j.lng})) : j.digAreaPolygon}), 'position:absolute;inset:0')}
+    <div class="maplabel">${S.moved?'Pin moved '+fkm(km(S.moved,j))+'. Approve to save it.':'Drag the pin to correct it'}</div>
+    ${S.moved?`<button class="maplabel" style="left:auto;right:10px" data-act="undoMove">Undo</button>`:''}</div>
+  <div class="body">
+    <div style="display:flex;gap:8px;align-items:center">${tchip(j.ticketType)}<span style="flex:1"></span>${badge(j.status)}</div>
+    ${dp?`<div class="note info"><b>No field locate needed.</b> Design & Planning requests get your records, not paint. Send the drawings and the ticket closes as cleared.</div>`:''}
+    ${big?`<div class="note warn"><b>Large project.</b> You have 10 business days from notification, due ${fdate(j.dueBy)}. Consider a Dedicated Locator if the work runs long.</div>`:''}
+    <div class="big" style="font-size:21px;margin-top:6px">${esc(j.address)}, ${esc(j.city)}</div>
+    <div class="muted">${esc(j.nearestIntersection)}</div>
+    ${uchips(j.utilityTypes)}
+    ${kv([['Requester',j.requesterName],['Company',j.requesterCompany],['Work',j.workType],['Description',j.workDescription],['Work begins',fdate(j.workToBeginDate)],['Due by',fdate(j.dueBy)],['Members',j.membersNotified.join(', ')]])}
+    <div class="sec" style="margin-top:6px">Locate area</div><div class="grey">${esc(j.locateAreaInstructions)}</div>
+    ${dp?'':`<div class="btns" style="margin-top:14px"><button class="btn alt sm" data-act="ala">Clear without a visit (ALA)</button><button class="btn alt sm" data-act="renegOpen">Renegotiate date</button></div>
+      <div class="helper" style="text-align:left">Use an Alternate Locate Agreement when your records show no plant in the dig area and the excavator has agreed to work from records.</div>`}
+    <div class="sec">History</div>${hist(j)}
+  </div>
+  <div class="foot"><div class="btns"><button class="btn danger" data-act="rejectOpen">Reject</button>${dp?`<button class="btn w3" data-act="sendRecords">Send records</button>`:`<button class="btn w3" data-act="approve">Approve for field locate</button>`}</div></div>`;
+},
+uTrack(){
+  const j = job(S.jobId), t = j.techPos || (j.assignedTechName===ME ? S.pos : j), d = km(t, j), eta = driveMin(d);
+  const line = j.status==='on_site' ? 'On site now' : j.status==='accepted' ? 'Accepted, not on the road yet' : `On the way · ${fkm(d)} · about ${eta} min`;
+  return hdr(j.ticketNumber,'Live tracking','go:uDash',`<div style="padding-right:6px">${badge(j.status)}</div>`) +
+  `<div style="flex:1;position:relative">${mapEl('m-track', () => { const tt = j.techPos || (j.assignedTechName===ME ? S.pos : j), dd = Math.max(km(tt,j),0.4);
+      return {center:{lat:(tt.lat+j.lat)/2,lng:(tt.lng+j.lng)/2}, ppk:Math.min(900, 230/dd), traffic:true, pins:[{id:j.id,lat:j.lat,lng:j.lng,...pinColor(j)}], cars:[{...tt}], route: j.status==='en_route' ? makeRoute(tt, j) : null}; }, 'position:absolute;inset:0')}
+  <div class="techcard">
+    <div style="display:flex;gap:12px;align-items:center"><div class="av" style="background:var(--blue)">${esc(j.assignedTechName[0])}</div>
+      <div style="flex:1"><b style="font-size:17px">${esc(j.assignedTechName)}</b><div class="muted">GreenFlag Locates · 4.8★ · Licence ORCGA-LT-48212</div></div>
+      <button class="ib" style="background:var(--o);color:#fff" aria-label="Call technician" data-act="ext" data-arg="the phone dialler">${ICON.phone}</button></div>
+    <div style="margin-top:10px;font-weight:600"><span style="color:var(--o)">●</span> ${esc(line)}</div>
+    <div class="muted">${esc(j.address)}, ${esc(j.city)}</div>
+    <button class="btn alt sm" style="margin-top:10px" data-act="shareTrack">Share live tracking with the excavator</button>
+  </div></div>`;
+},
+uRate(){
+  const j = job(S.jobId);
+  return hdr('Review completed locate', j.ticketNumber, 'go:uDash') + `<div class="body">
+    <div style="display:flex;gap:12px;align-items:center"><div class="av" style="background:var(--blue)">${esc(j.assignedTechName[0])}</div>
+      <div style="flex:1"><b style="font-size:17px">${esc(j.assignedTechName)}</b><div class="muted">${j.arrivedMin||38} min on site · ${esc(j.address)}</div></div></div>
+    <button class="btn alt sm" style="margin-top:12px" data-act="docView">Open the locate document sent to the excavator</button>
+    <div class="sec">Photos</div><div class="gallery">${(j.photos||[]).map((p,i)=>`<img src="${p}" alt="Site photo ${i+1}">`).join('')}</div>
+    <div class="sec">Utilities</div>
+    ${j.utilityTypes.map(u=>{ const a=(j.checklist||{})[u]||'located'; return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0">${uchip(u)}<b style="color:${a==='located'?'var(--green)':'var(--g)'}">${a[0].toUpperCase()+a.slice(1)}${j.offsets&&j.offsets[u]!=null&&a==='located'?` · ${(+j.offsets[u]).toFixed(1)} m`:''}</b></div>`; }).join('')}
+    <div class="sec">Technician notes</div><div class="grey">${esc(j.techNotes||'No notes.')}</div>
+    <div class="sec">Rate this locate</div>
+    <div class="stars">${[1,2,3,4,5].map(n=>`<button data-act="star" data-arg="${n}" aria-label="${n} stars">${n<=S.rating?'★':'☆'}</button>`).join('')}</div>
+    <textarea id="comment" rows="3" style="margin-top:8px" placeholder="Comments for the technician and their company">${esc(S.comment)}</textarea>
+    <div class="helper" style="text-align:left">Approve with 3 stars or more closes the job. Flag, or under 3 stars, sends it back to the locate company as a dispute.</div>
+    <div class="sec">History</div>${hist(j)}
+  </div>
+  <div class="foot"><div class="btns"><button class="btn danger" data-act="decide" data-arg="flag">Flag issue</button><button class="btn w3" data-act="decide" data-arg="approve">Approve technician</button></div></div>`;
+}
+};
+
+/* ---------- sketch and document ---------- */
+function sketchSvg(j, located, offsets = S.offsets, ref = S.ref){
+  const W = 360, H = 250, curbY = 196, propY = 160, bldY = 70, scale = 9; // px per metre from reference
+  const base = ref==='curb' ? curbY : ref==='property' ? propY : bldY + 50, dir = ref==='building' ? 1 : -1;
+  let s = `<svg class="lot" viewBox="0 0 ${W} ${H}" role="img" aria-label="Locate sketch">
+    <rect x="0" y="${curbY}" width="${W}" height="${H-curbY}" fill="#D7DADF"/><text x="${W-8}" y="${H-12}" text-anchor="end" font-size="11" fill="#5F6368">${esc((j.nearestIntersection||'').split('&')[0].trim())}</text>
+    <rect x="0" y="${propY+8}" width="${W}" height="${curbY-propY-8}" fill="#EEF0EA"/><rect x="0" y="${propY+14}" width="${W}" height="10" fill="#E3E5E8"/>
+    <line x1="0" x2="${W}" y1="${curbY}" y2="${curbY}" stroke="#80868B" stroke-width="3"/>
+    <line x1="0" x2="${W}" y1="${propY}" y2="${propY}" stroke="#80868B" stroke-dasharray="6 5"/><text x="6" y="${propY-4}" font-size="10" fill="#5F6368">Property line</text>
+    <rect x="${W/2-70}" y="${bldY-50}" width="140" height="${50+50}" rx="3" fill="#fff" stroke="#80868B" stroke-width="2"/><text x="${W/2}" y="${bldY}" text-anchor="middle" font-size="12" font-weight="700" fill="#3C4043">${esc(j.address.split(' ')[0])}</text>
+    <rect x="${W/2+10}" y="${bldY+50}" width="34" height="${curbY-bldY-50}" fill="#E3E5E8"/>
+    <text x="${W-8}" y="${curbY-5}" text-anchor="end" font-size="10" fill="#5F6368">Curb</text>`;
+  if (j.digAreaPolygon) s += `<rect x="30" y="${bldY+60}" width="${W-60}" height="${curbY-bldY-62}" fill="#FF6B0018" stroke="#FF6B00" stroke-dasharray="6 4"/>`;
+  located.forEach((u,i) => { const y = base + dir*offsets[u]*scale; const yy = Math.max(6, Math.min(H-6, y));
+    s += `<line x1="16" x2="${W-16}" y1="${yy}" y2="${yy}" stroke="${UTIL[u]}" stroke-width="4" stroke-dasharray="14 6"/>`;
+    const x = 40 + i*70; s += `<line x1="${x}" x2="${x}" y1="${base}" y2="${yy}" stroke="#3C4043" stroke-width="1"/><text x="${x+4}" y="${(base+yy)/2}" font-size="10.5" font-weight="700" fill="#3C4043" stroke="#fff" stroke-width="3" paint-order="stroke">${offsets[u].toFixed(1)} m</text>`; });
+  s += `<text x="8" y="16" font-size="11" font-weight="700" fill="#3C4043">N ↑ · not to scale</text></svg>`;
+  return s;
+}
+function docHtml(j, ro){
+  const located = j.utilityTypes.filter(u => (ro ? (j.checklist||{})[u]==='located' : S.check[u]==='Located'));
+  const offsets = ro ? (j.offsets||{}) : S.offsets, res = u => ro ? ((j.checklist||{})[u]||'located') : (S.check[u]||'').toLowerCase();
+  const valid = ro ? j.validUntil : Date.now() + 60*DAY;
+  return `<div class="doc">
+    <div class="dh"><div><h3>Locate report</h3><div class="muted">Ticket ${esc(j.ticketNumber)} · ${esc(j.ticketType)}</div></div><div style="text-align:right"><b>GreenFlag Locates</b><div class="muted">for Enbridge Gas and others</div></div></div>
+    <table><tr><th>Address</th><td>${esc(j.address)}, ${esc(j.city)}</td></tr><tr><th>Excavator</th><td>${esc(j.requesterCompany)} (${esc(j.requesterName)})</td></tr><tr><th>Work</th><td>${esc(j.workType)}</td></tr><tr><th>Located</th><td>${fdate(ro ? j.t.completed : Date.now())}</td></tr></table>
+    <div class="valid">Valid until ${fday(valid)} (60 days). Keep this document on site while you dig.</div>
+    <table><tr><th>Utility</th><th>Result</th><th>From ${ro?'curb':esc(S.ref)}</th></tr>${j.utilityTypes.map(u=>`<tr><td>${u[0].toUpperCase()+u.slice(1)}</td><td>${res(u)==='located'?'Marked':res(u)==='clear'?'Clear':'N/A'}</td><td class="num">${res(u)==='located'&&offsets[u]!=null?(+offsets[u]).toFixed(1)+' m':'–'}</td></tr>`).join('')}</table>
+    ${sketchSvg(j, located, offsets, ro ? 'curb' : S.ref)}
+    <p style="margin:8px 0 4px"><b>Before you dig:</b> hand dig or hydrovac within 1 m on either side of every mark. Marks show position, not depth. If marks are gone or conditions change, stop and request a re-mark.</p>
+    ${(ro ? j.techNotes : S.notes) ? `<p style="margin:4px 0"><b>Notes:</b> ${esc(ro ? j.techNotes : S.notes)}</p>` : ''}
+    <div style="display:flex;gap:6px;margin:8px 0">${(ro ? (j.photos||[]) : S.photos).slice(0,4).map(p=>`<img src="${p}" alt="" style="width:23%;aspect-ratio:4/3;object-fit:cover;border-radius:4px">`).join('')}</div>
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-end"><div><b>${esc(ro ? j.assignedTechName : ME)}</b><div class="muted">Locator licence ORCGA-LT-48212</div></div>
+      <div style="flex:1;max-width:170px">${(ro || S.signed) ? `<svg viewBox="0 0 170 60" style="width:100%"><path d="M8 44 C 25 10, 35 52, 52 30 S 80 12, 92 38 S 120 50, 135 22 L 160 30" fill="none" stroke="#1A3C8F" stroke-width="2.4" stroke-linecap="round"/></svg>` : `<div class="sig" data-act="sign">Tap to sign</div>`}</div></div>
+  </div>`;
+}
+
+/* ---------- render ---------- */
+function render(){
+  if (S.screen!=='uTrack' && !(S.screen==='uDash' && S.uView==='map') && window._track){ clearInterval(window._track); window._track = null; }
+  MAPS = {};
+  app.innerHTML = SCREENS[S.screen]();
+  document.querySelectorAll('.brief [data-act=role]').forEach(b => b.classList.toggle('on', !!S.role && b.dataset.arg===S.role));
+  const mb = $('#mb-role'); if (mb) mb.textContent = S.role==='tech' ? 'Switch to reviewer' : S.role==='uio' ? 'Switch to technician' : 'Pick a role';
+  drawMaps();
+  if (MAPS['m-home']) bindPan('m-home', S.views.tHome);
+  if (MAPS['m-uio']) bindPan('m-uio', S.views.uMap);
+  if (MAPS['m-review']) bindDrag();
+  if (S.screen==='uTrack' || (S.screen==='uDash' && S.uView==='map')) startTrack();
+  bindSwipes();
+  const n = $('#notes'); if (n) n.addEventListener('input', e => { S.notes = e.target.value; const b = $('[data-act=toSketch]'), j = job(S.jobId); if (b) b.classList.toggle('dim', !(S.photos.length>=3 && j.utilityTypes.every(u=>S.check[u]) && S.notes.trim().length>=5)); });
+  const c = $('#comment'); if (c) c.addEventListener('input', e => S.comment = e.target.value);
+  document.querySelectorAll('[data-off]').forEach(r => r.addEventListener('input', e => { const u = e.target.dataset.off; S.offsets[u] = +e.target.value; $('#o-'+u).textContent = S.offsets[u].toFixed(1)+' m';
+    const lot = $('.lot'), j = job(S.jobId); if (lot) lot.outerHTML = sketchSvg(j, j.utilityTypes.filter(x => S.check[x]==='Located')); }));
+  if (S.office.open) renderOffice();
+}
+function go(screen){ S.screen = screen; render(); const b = $('.body'); if (b) b.scrollTop = 0; }
+
+function bindSwipes(){
+  document.querySelectorAll('.swipe').forEach(sw => {
+    const knob = sw.querySelector('.knob'); let x0 = null, dx = 0;
+    const max = () => sw.clientWidth - knob.offsetWidth - 10;
+    const fire = () => { const act = sw.dataset.swipe, arg = sw.dataset.arg; knob.style.transform = `translateX(${max()}px)`; setTimeout(() => ACT[act] && ACT[act](arg), 120); };
+    knob.addEventListener('pointerdown', e => { x0 = e.clientX; dx = 0; knob.setPointerCapture(e.pointerId); knob.style.transition = 'none'; });
+    knob.addEventListener('pointermove', e => { if (x0 === null) return; dx = Math.max(0, Math.min(max(), e.clientX - x0)); knob.style.transform = `translateX(${dx}px)`; sw.querySelector('.lbl').style.opacity = 1 - dx/max(); });
+    knob.addEventListener('pointerup', () => { if (x0 === null) return; x0 = null; knob.style.transition = 'transform .2s';
+      if (dx >= max()*0.85) fire(); else { knob.style.transform = ''; sw.querySelector('.lbl').style.opacity = 1; if (dx < 6) toast('Swipe the arrow to the right to confirm.'); } });
+    knob.addEventListener('keydown', e => { if (e.key==='Enter' || e.key===' '){ e.preventDefault(); fire(); } });
+  });
+}
+function offerSheet(j, label){
+  if (S.offerTimer) clearInterval(S.offerTimer);
+  const urgent = j.priority==='emergency' || j.ticketType==='Priority';
+  label = label || (j.priority==='emergency' ? 'Emergency locate request' : j.ticketType==='Priority' ? 'Priority locate request' : 'Open locate request');
+  S.offerLeft = 30;
+  const sc = document.createElement('div'); sc.className = 'scrim'; sc.id = 'offer';
+  const d = km(S.pos, j), onsite = 25 + (j.utilityTypes.length*6), C = 2*Math.PI*25;
+  const timer = () => `<svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="25" fill="none" stroke="#F3F5F8" stroke-width="5"/><circle cx="29" cy="29" r="25" fill="none" stroke="#FF6B00" stroke-width="5" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-S.offerLeft/30)}" transform="rotate(-90 29 29)" stroke-linecap="round"/></svg>${S.offerLeft}`;
+  sc.innerHTML = `<div class="sheet" role="dialog" aria-label="${label}"><div class="grab"></div>
+      ${j.priority==='emergency'?'<div class="ban">EMERGENCY LOCATE</div>':''}
+      <div style="display:flex;align-items:center;gap:10px"><b class="muted" style="flex:1">${label}</b>${urgent?`<div class="timer" aria-label="Seconds left">${timer()}</div>`:''}</div>
+      <div class="big">${esc(j.address)}</div><div class="muted">${esc(j.city)} · ${esc(j.nearestIntersection)}</div>
+      <div class="facts"><div><b>${driveMin(d)} min</b><span>${fkm(d)} drive</span></div><div><b>~${onsite} min</b><span>On site, est.</span></div><div><b style="color:${(new Date(j.dueBy)-Date.now())<DAY?'var(--red)':'inherit'}">${ftime(j.dueBy)}</b><span>Due ${new Date(j.dueBy).toLocaleDateString('en-CA',{weekday:'short',...tz})}</span></div></div>
+      ${uchips(j.utilityTypes)}
+      <div style="font-weight:700;margin:12px 0 6px">${esc(j.workType)}</div><div class="grey">${esc(j.locateAreaInstructions)}</div>
+      <div class="btns" style="margin-top:16px"><button class="btn alt" data-act="skip">${urgent?'Decline':'Not now'}</button><button class="btn w3" style="min-height:58px" data-act="accept" data-arg="${j.id}">${urgent?'Accept and go now':'Add to my route'}</button></div>
+    </div>`;
+  app.appendChild(sc);
+  if (urgent) S.offerTimer = setInterval(() => { S.offerLeft--; if (S.offerLeft <= 0){ closeOffer(); toast('Offer expired. It went to the next technician.'); } else { const t = sc.querySelector('.timer'); if (t) t.innerHTML = timer(); } }, 1000);
+}
+function closeOffer(){ if (S.offerTimer) clearInterval(S.offerTimer); S.offerTimer = null; const o = $('#offer'); if (o) o.remove(); }
+function sheet(id, html){ const old = document.getElementById(id); if (old) old.remove(); const sc = document.createElement('div'); sc.className = 'scrim'; sc.id = id; sc.innerHTML = `<div class="sheet"><div class="grab"></div>${html}</div>`; sc.addEventListener('click', e => { if (e.target === sc) sc.remove(); }); app.appendChild(sc); return sc; }
+function bindDrag(){
+  const el = document.getElementById('m-review'), j = job(S.jobId); if (!el) return;
+  let dragging = false;
+  const ppk = 2600, toLL = e => { const r = el.getBoundingClientRect(); const x = e.clientX - r.left - r.width/2, y = e.clientY - r.top - r.height/2;
+    return {lat: j.lat - y/(111.32*ppk), lng: j.lng + x/(111.32*Math.cos(j.lat*Math.PI/180)*ppk)}; };
+  el.addEventListener('pointerdown', e => { if (e.target.closest('.pin')){ dragging = true; el.setPointerCapture(e.pointerId); e.preventDefault(); } });
+  el.addEventListener('pointermove', e => { if (!dragging) return; S.moved = toLL(e); drawMap('m-review'); });
+  el.addEventListener('pointerup', () => { if (!dragging) return; dragging = false; render(); });
+}
+function startTrack(){
+  if (window._track) return;
+  window._track = setInterval(() => {
+    for (const j of jobs){ if (!j.techPos || j.status!=='en_route') continue;
+      if (!j._route) j._route = makeRoute(j.techPos, j), j._seg = 0;
+      const tgt = j._route[j._seg+1], d = km(j.techPos, tgt);
+      if (d < 0.08){ if (j._seg < j._route.length-2) j._seg++; else { j.status = 'on_site'; log(j, `${j.assignedTechName} arrived on site`); render(); continue; } }
+      else { const f = Math.min(1, 0.22/d); j.techPos = {lat: j.techPos.lat+(tgt.lat-j.techPos.lat)*f, lng: j.techPos.lng+(tgt.lng-j.techPos.lng)*f}; }
+    }
+    if (S.screen==='uTrack') drawMap('m-track');
+    if (S.screen==='uDash' && S.uView==='map') drawMap('m-uio');
+  }, 1200);
+}
+const dateChoices = j => { const base = new Date(j.dueBy).getTime(); return [['Tomorrow, 10 a.m.', (()=>{ const d = new Date(Date.now()+DAY); d.setHours(10,0,0,0); return d.getTime(); })()], ['+1 business day', base + DAY], ['+2 business days', base + 2*DAY], ['+5 business days', base + 7*DAY]]; };
+
+/* ---------- actions ---------- */
+const ACT = {
+  role(r){ closeOffer(); clearTimers(); S.role = r || null; S.screen = r==='tech' ? 'tHome' : r==='uio' ? 'uDash' : 'start'; render(); if (r==='tech' && !S.online) later(() => toast('Flip the switch at the top to start your shift.'), 600); },
+  roleSwap(){ ACT.role(S.role==='tech' ? 'uio' : 'tech'); },
+  reset(){ S.office.open = false; renderOffice(); reset(); },
+  go(a){ go(a); },
+  homeMode(m){ S.homeMode = m; closeOffer(); render(); },
+  recenter(){ S.follow = true; S.views.tHome.ppk = Math.max(S.views.tHome.ppk, 14); render(); },
+  traffic(){ S.traffic = !S.traffic; render(); toast(S.traffic ? 'Live traffic on. Green is moving, red is slow.' : 'Traffic off.'); },
+  busy(){ S.busy = !S.busy; render(); toast(S.busy ? 'Orange areas have the most locate requests right now.' : 'Busy areas off.'); },
+  records(){ S.records = !S.records; render(); },
+  policy(){ sheet('pol', `<b style="font-size:18px">Location tracking while you work</b>
+      <p class="muted" style="margin:6px 0 10px;font-size:14.5px">GreenFlag Locates' electronic monitoring policy, summarized:</p>
+      <div class="list">
+        <button tabindex="-1"><span class="ico" style="background:var(--blue)">1</span><div><b>Only while you're on shift</b><span>Tracking starts when you flip the switch and stops when you end your shift.</span></div></button>
+        <button tabindex="-1"><span class="ico" style="background:var(--blue)">2</span><div><b>Who sees it</b><span>Your dispatcher, and the utility while you're travelling to their ticket.</span></div></button>
+        <button tabindex="-1"><span class="ico" style="background:var(--blue)">3</span><div><b>What it's used for</b><span>Dispatch, safety check-ins, and proof of when a locate was done.</span></div></button>
+        <button tabindex="-1"><span class="ico" style="background:var(--blue)">4</span><div><b>How long it's kept</b><span>Trip history is kept with the ticket record. Your company's policy sets the retention period.</span></div></button>
+      </div>
+      <button class="btn" style="margin-top:14px" data-act="consent">I understand, start my shift</button>`); },
+  consent(){ S.consented = true; ACT.closeSheet('pol'); ACT.toggleOnline(); },
+  toggleOnline(){
+    if (!S.online && !S.consented){ ACT.policy(); return; }
+    S.online = !S.online; render();
+    if (S.online){
+      const n = dayRoute().order.length;
+      toast(`Shift started. ${n} stops on your route today.`);
+      if (!S.incomingSent){ S.incomingSent = true;
+        later(() => { const inc = jobs.find(j => j.status==='incoming'); if (!inc || !S.online) return; inc.status = 'approved_active'; inc.ticketType = 'Emergency'; log(inc, 'Emergency ticket received from Ontario One Call');
+          if (S.screen==='tHome'){ render(); if (!jobs.some(j=>j.assignedTechName===ME && ['en_route','on_site'].includes(j.status)) && nearby().some(j=>j.id===inc.id)) offerSheet(inc); } }, 6000); }
+    } else { closeOffer(); toast('Shift ended. Location tracking stopped.'); }
+  },
+  offline(){ S.offline = !S.offline; if (!S.offline && S.queue){ const n = S.queue; S.queue = 0; S.synced = Date.now(); render(); toast(`Back online. ${n} update${n===1?'':'s'} synced to the utility and Ontario One Call.`); } else { render(); if (S.offline) toast('No signal. You can keep working: updates are saved on the phone.'); } },
+  offer(id){ offerSheet(job(id)); },
+  skip(){ closeOffer(); },
+  accept(id){ const j = job(id); closeOffer(); if (j.status!=='approved_active'){ toast('Another technician just took this job.'); return; }
+    const urgent = j.priority==='emergency' || j.ticketType==='Priority';
+    j.assignedTechName = ME; S.photos = []; S.check = {}; S.notes = ''; S.offsets = {}; S.signed = false; S.siteRating = null;
+    if (urgent){ j.status = 'accepted'; j.t = {accepted: Date.now()}; sync(j, 'Accepted by Test Technician'); S.jobId = id; go('tActive'); toast('Accepted. It goes ahead of your route. Swipe to start the trip.'); }
+    else { j.status = 'scheduled'; sync(j, 'Added to Test Technician’s route'); S.homeMode = 'route'; render(); toast('Added to your route. Order updated.'); } },
+  openActive(id){ const j = job(id); S.jobId = id; if (S.jobId !== S._lastJob){ S.photos = []; S.check = {}; S.notes = ''; S.offsets = {}; S.signed = false; S._lastJob = id; } go(j.status==='en_route' && S.route ? 'tNav' : 'tActive'); },
+  startTrip(id){ const j = job(id); const other = jobs.find(x => x!==j && x.assignedTechName===ME && ['en_route','on_site'].includes(x.status));
+    if (other){ toast('Finish your current job first: ' + other.address + '.'); return; }
+    if (['accepted','scheduled'].includes(j.status)){ j.status = 'en_route'; j.t = j.t || {}; j.t.started = Date.now(); sync(j, 'Trip started'); }
+    S.route = makeRoute(S.pos, j); S.routeSeg = 0; S.heading = bearing(S.route[0], S.route[1]); go('tNav'); toast('Trip started. The utility can now see you on the map.'); },
+  simDrive(){ const j = job(S.jobId); if (S.drive) return;
+    const step = Math.max(0.12, routeLeft()/24);
+    S.drive = setInterval(() => {
+      const tgt = S.route[S.routeSeg+1], d = km(S.pos, tgt);
+      if (d <= step){ S.pos = {...tgt}; if (S.routeSeg < S.route.length-2){ S.routeSeg++; S.heading = bearing(S.route[S.routeSeg], S.route[S.routeSeg+1]); }
+        else { clearInterval(S.drive); S.drive = null; S.pos = {lat:j.lat+0.0005, lng:j.lng}; if (S.screen==='tNav') render(); toast("You're at the site. Swipe to confirm you've arrived."); return; } }
+      else { const f = step/d; S.pos = {lat: S.pos.lat+(tgt.lat-S.pos.lat)*f, lng: S.pos.lng+(tgt.lng-S.pos.lng)*f}; }
+      if (S.screen==='tNav') render();
+    }, 500); },
+  arrive(id){ const j = job(id), d = km(S.pos, j);
+    if (d > 0.15){ toast(`You're ${fkm(d)} from the dig site. Arrived unlocks within 150 m.`); render(); return; }
+    if (S.drive){ clearInterval(S.drive); S.drive = null; }
+    j.status = 'on_site'; j.t.arrived = Date.now(); sync(j, 'Arrived on site (GPS within 150 m)'); S.route = null; S.heading = null; S.records = true; go('tActive'); toast('Checked in on site. Utility records are on the map.'); },
+  goComplete(){ go('tComplete'); },
+  ext(what){ toast('In the real app this opens ' + what + '.'); },
+  issue(){ sheet('iss', `<b style="font-size:18px">Report an issue</b><div class="list" style="margin-top:6px">${['Locked gate or no access','Dog or safety concern on site','Address or dig area is wrong','White paint or flags missing','Something else'].map(t=>`<button data-act="issueSend" data-arg="${esc(t)}"><span class="ico" style="background:var(--o)">!</span><div><b>${t}</b></div></button>`).join('')}</div>`); },
+  issueSend(t){ ACT.closeSheet('iss'); const j = job(S.jobId); if (j) sync(j, 'Issue reported: ' + t); toast('Sent to dispatch: ' + t + '.'); },
+  jobMenu(){ sheet('jm', `<b style="font-size:18px">Job options</b><div class="list" style="margin-top:6px">
+      <button data-act="delayOpen"><span class="ico" style="background:#F29900">!</span><div><b>Report a delay</b><span>Required if you'll miss the due date. Goes to the utility and Ontario One Call.</span></div></button>
+      <button data-act="dropOpen"><span class="ico" style="background:var(--g)">×</span><div><b>Can't complete this job</b><span>Sends it back to dispatch for another technician</span></div></button></div>`); },
+  delayOpen(){ ACT.closeSheet('jm'); const j = job(S.jobId);
+    sheet('dly', `<b style="font-size:18px">Report a delay</b><p class="muted" style="margin:4px 0 8px;font-size:14px">Due ${fdate(j.dueBy)}. Pick the date you can deliver. The utility will confirm it with the excavator.</p>
+      <div class="list">${dateChoices(j).map(([l,t])=>`<button data-act="delaySend" data-arg="${t}"><div><b>${l}</b><span>${fdate(t)}</span></div></button>`).join('')}</div>
+      <div class="sec" style="font-size:15px">Reason</div><div class="qr">${['Records request pending','Weather','Too many emergencies today','Site access'].map(r=>`<button data-act="delayReason" data-arg="${r}" class="${S._dr===r?'on':''}" style="${S._dr===r?'background:#FFE6D5;border-color:#FF6B00':''}">${r}</button>`).join('')}</div>`); },
+  delayReason(r){ S._dr = r; ACT.delayOpen(); },
+  delaySend(t){ const j = job(S.jobId); j.delay = {newDue: new Date(+t).toISOString(), reason: S._dr || 'Not given', by: ME, state:'pending'}; sync(j, `Notice of delay sent: new date ${fday(+t)}`); ACT.closeSheet('dly'); render(); toast('Delay notice sent to the utility and Ontario One Call.'); },
+  dropOpen(){ ACT.closeSheet('jm'); sheet('drop', `<b style="font-size:18px">Can't complete this job?</b><p class="muted" style="margin:4px 0 4px">It goes back to dispatch for another technician.</p><div class="list">${['Vehicle problem','Emergency call came in','Not trained for these utilities','Site unsafe','Personal reason'].map(t=>`<button data-act="drop" data-arg="${esc(t)}"><div><b>${t}</b></div></button>`).join('')}</div>`); },
+  drop(reason){ const j = job(S.jobId); j.status = 'approved_active'; j.assignedTechName = null; S.route = null; S.heading = null; if (S.drive){ clearInterval(S.drive); S.drive = null; }
+    sync(j, 'Returned to dispatch: ' + reason); ACT.closeSheet('drop'); go('tHome'); toast('Job returned to dispatch (' + reason + ').'); },
+  chatOpen(){ const j = job(S.jobId); const msgs = S.chat[j.id] = S.chat[j.id] || [{them:true, text:`Hi, this is ${j.requesterName.split(' ')[0]} from ${j.requesterCompany}. White paint is out front.`, read:false}];
+    msgs.forEach(m => m.read = true);
+    sheet('chat', `<div style="display:flex;align-items:center;gap:10px"><div class="av" style="background:var(--n);width:40px;height:40px">${esc(j.requesterName[0])}</div><div><b>${esc(j.requesterName)}</b><div class="muted" style="font-size:13px">${esc(j.requesterCompany)} · numbers are hidden in the app</div></div></div>
+      <div class="chat">${msgs.map(m=>`<div class="msg ${m.them?'them':'me'}">${esc(m.text)}</div>`).join('')}</div>
+      <div class="qr">${["I'm on my way","I've arrived","Can't access the site","Where is the white paint?","Running about 15 min late"].map(q=>`<button data-act="say" data-arg="${esc(q)}">${q}</button>`).join('')}</div>
+      <div class="btns"><input type="text" id="chatin" placeholder="Type a message" style="flex:3"><button class="btn sm" style="flex:1" data-act="say">Send</button></div>`); },
+  say(t){ const j = job(S.jobId), inp = $('#chatin'); const text = t || (inp && inp.value.trim()); if (!text) return;
+    S.chat[j.id].push({me:true, text}); ACT.chatOpen();
+    later(() => { if (!S.chat[j.id]) return; S.chat[j.id].push({them:true, read:!!$('#chat'), text: /access/i.test(text) ? 'Gate code is 4412. Side gate on the left.' : /paint/i.test(text) ? 'Along the front lot line, by the driveway.' : 'Thanks, see you there.'}); if ($('#chat')) ACT.chatOpen(); else if (S.screen==='tActive') render(); }, 1800); },
+  safety(){ sheet('safe', `<div style="display:flex;align-items:center;gap:10px">${ICON.shield}<b style="font-size:18px">Safety toolkit</b></div>
+    <div class="list" style="margin-top:6px">
+      <button data-act="ext" data-arg="the phone dialler with 911"><span class="ico" style="background:var(--red)">911</span><div><b>Call 911</b><span>Gas smell, damaged line, injury, or any emergency</span></div></button>
+      <button data-act="strike"><span class="ico" style="background:var(--o)">!</span><div><b>Report a utility strike</b><span>Photos, location and time go to the utility and your supervisor</span></div></button>
+    </div>
+    <div class="toggle"><div><b>Share my live location with my supervisor</b><span>Until I end my shift</span></div><button class="switch ${S.safety.share?'on':''}" role="switch" aria-checked="${S.safety.share}" aria-label="Share live location" data-act="safeTog" data-arg="share"></button></div>
+    <div class="toggle"><div><b>Lone-worker check-in</b><span>Asks if you're OK every 30 minutes on site and alerts your supervisor if you don't answer</span></div><button class="switch ${S.safety.checkin?'on':''}" role="switch" aria-checked="${S.safety.checkin}" aria-label="Lone-worker check-in" data-act="safeTog" data-arg="checkin"></button></div>`); },
+  safeTog(k){ S.safety[k] = !S.safety[k]; ACT.safety(); toast(k==='share' ? (S.safety.share ? 'Your supervisor can now see your live location.' : 'Location sharing with supervisor off.') : (S.safety.checkin ? 'Check-ins on. First one in 30 minutes.' : 'Check-ins off.')); },
+  strike(){ ACT.closeSheet('safe'); toast('In the real app this opens the strike report with your GPS position filled in.'); },
+  today(){ S.tab = 0; go('tJobs'); },
+  prefs(){ const P = S.pref;
+    sheet('prefs', `<b style="font-size:18px">Open request preferences</b>
+      <div class="toggle"><div><b>Emergency locates only</b><span>Hide standard and priority requests</span></div><button class="switch ${P.emerg?'on':''}" role="switch" aria-checked="${P.emerg}" aria-label="Emergency only" data-act="prefTog" data-arg="emerg"></button></div>
+      <div class="toggle"><div><b>Requests on my way home</b><span>Only show requests within 3 km of your route to ${HOME_BASE.name}</span></div><button class="switch ${P.homeMode?'on':''}" role="switch" aria-checked="${P.homeMode}" aria-label="Requests on my way home" data-act="prefTog" data-arg="homeMode"></button></div>
+      <div class="note info">You only see requests for utilities you're certified for (${Object.keys(CERTS).filter(u=>CERTS[u]).join(', ')}). Your admin manages certifications.</div>
+      <div class="sec" style="font-size:15.5px">Distance</div><div class="muted" id="radlbl">Within ${P.radius} km</div>
+      <input type="range" min="5" max="100" step="5" value="${P.radius}" id="prefrad" aria-label="Distance">
+      <button class="btn" style="margin-top:14px" data-act="prefDone">Show ${nearby().length} requests</button>`);
+    $('#prefrad').addEventListener('input', e => { P.radius = +e.target.value; $('#radlbl').textContent = 'Within ' + P.radius + ' km'; $('[data-act=prefDone]').textContent = 'Show ' + nearby().length + ' requests'; }); },
+  prefTog(k){ S.pref[k] = !S.pref[k]; ACT.prefs(); },
+  prefDone(){ ACT.closeSheet('prefs'); render(); },
+  addPhoto(){ const j = job(S.jobId); S.photos.push(photo(j.utilityTypes, S.photos.length+1)); render(); },
+  rmPhoto(i){ S.photos.splice(+i,1); render(); },
+  check(a){ const [u,v] = a.split('|'); S.check[u] = v; render(); },
+  toSketch(){ const j = job(S.jobId);
+    if (!(S.photos.length>=3 && j.utilityTypes.every(u=>S.check[u]) && S.notes.trim().length>=5)){ toast('Add at least 3 photos, answer every utility, and write a short note.'); return; }
+    go('tSketch'); },
+  ref(k){ S.ref = k; render(); },
+  toDoc(){ go('tDoc'); },
+  sign(){ S.signed = true; render(); toast('Signed.'); },
+  submitDoc(){ const j = job(S.jobId);
+    j.outcome = j.utilityTypes.some(u => S.check[u]==='Located') ? 'marked' : 'cleared';
+    j.status = 'completed_pending_review'; j.photos = [...S.photos]; j.checklist = Object.fromEntries(Object.entries(S.check).map(([k,v])=>[k,v.toLowerCase()])); j.techNotes = S.notes; j.offsets = {...S.offsets};
+    j.t.completed = Date.now(); j.validUntil = j.t.completed + 60*DAY; j.arrivedMin = Math.max(1, Math.round((j.t.completed - (j.t.arrived||j.t.completed))/6e4));
+    sync(j, `Locate document signed and sent to ${j.requesterName}`); sync(j, `Status ${j.outcome==='cleared'?'Cleared':'Marked'} reported to Ontario One Call`);
+    if (j.delay && j.delay.state==='pending') j.delay.state = 'resolved';
+    S.stats.jobs++; S.stats.mins += 25; go('tSummary'); },
+  siteRate(v){ S.siteRating = v; render(); toast(v==='up' ? 'Thanks.' : 'Thanks. The utility will see a flag on this ticket.'); },
+  backToMap(){ S.homeMode = 'route'; go('tHome');
+    later(() => { const emerg = nearby().find(j => j.priority==='emergency' || j.ticketType==='Priority');
+      if (emerg && S.screen==='tHome' && !myActive()) offerSheet(emerg); else { const n = dayRoute().order[0]; if (n && S.screen==='tHome') toast(`Next stop: ${n.j.address}, ${driveMin(n.drive)} min away.`); } }, 1500); },
+  tab(i){ S.tab = +i; render(); },
+  uView(v){ S.uView = v; render(); },
+  uType(t){ S.uType = t; render(); },
+  review(id){ S.jobId = id; S.moved = null; go('uReview'); },
+  undoMove(){ S.moved = null; render(); },
+  approve(){ const j = job(S.jobId); if (S.moved){ const dLat = S.moved.lat-j.lat, dLng = S.moved.lng-j.lng; j.lat = S.moved.lat; j.lng = S.moved.lng; j.digAreaPolygon = j.digAreaPolygon.map(p=>({lat:p.lat+dLat,lng:p.lng+dLng})); sync(j, 'Pin corrected by reviewer'); }
+    j.status = 'approved_active'; sync(j, 'Location approved for field locate'); S.moved = null; go('uDash'); toast('Approved. It is now open to certified technicians nearby.'); },
+  ala(){ const j = job(S.jobId); j.status = 'cleared'; j.outcome = 'cleared'; j.t.completed = Date.now(); j.validUntil = Date.now() + 60*DAY;
+    sync(j, 'Cleared under an Alternate Locate Agreement, no field visit'); sync(j, 'Status Cleared reported to Ontario One Call'); go('uDash'); toast('Cleared without a visit. The excavator gets the ALA document.'); },
+  sendRecords(){ const j = job(S.jobId); j.status = 'cleared'; j.outcome = 'records'; sync(j, 'Records sent to the requester (Design & Planning)'); sync(j, 'Status reported to Ontario One Call'); go('uDash'); toast('Records sent. Design & Planning ticket closed.'); },
+  renegOpen(){ const j = job(S.jobId);
+    sheet('rng', `<b style="font-size:18px">Renegotiate the due date</b><p class="muted" style="margin:4px 0 8px;font-size:14px">Only after the excavator agrees. The new date is recorded as renegotiated in 360 Feedback.</p>
+      <div class="list">${dateChoices(j).map(([l,t])=>`<button data-act="renegSet" data-arg="${t}"><div><b>${l}</b><span>${fdate(t)}</span></div></button>`).join('')}</div>`); },
+  renegSet(t){ const j = job(S.jobId); j.dueBy = new Date(+t).toISOString(); j.delay = {newDue:j.dueBy, reason:'Agreed with excavator', by:'Reviewer', state:'agreed'}; sync(j, `Due date renegotiated to ${fday(+t)} and recorded in 360 Feedback`); ACT.closeSheet('rng'); render(); toast('Renegotiated date saved and reported.'); },
+  delayView(id){ const j = job(id);
+    sheet('dv', `<b style="font-size:18px">Delay notice · ${esc(j.ticketNumber)}</b>
+      <div class="note warn"><b>${esc(j.delay.by)}</b> can't make ${fdate(j.dueBy)}.<br>Proposed: <b>${fdate(j.delay.newDue)}</b><br>Reason: ${esc(j.delay.reason)}</div>
+      <p class="muted" style="font-size:14px;margin:4px 0 10px">Ontario One Call has been notified of the delay. If the excavator agrees, record the new date as renegotiated.</p>
+      <div class="btns"><button class="btn alt" data-act="delayCall" data-arg="${j.id}">Call the excavator</button><button class="btn w3" data-act="delayAgree" data-arg="${j.id}">Excavator agreed</button></div>`); },
+  delayCall(){ toast('In the real app this calls the excavator.'); },
+  delayAgree(id){ const j = job(id); j.dueBy = j.delay.newDue; j.delay.state = 'agreed'; sync(j, `Due date renegotiated to ${fday(j.dueBy)} and recorded in 360 Feedback`); ACT.closeSheet('dv'); render(); toast('Renegotiated date recorded.'); },
+  expView(id){ const j = job(id), dl = daysLeft(j), st = j.continuation==='received';
+    sheet('exp', `<b style="font-size:18px">${esc(j.address)}</b><div class="muted">${esc(j.ticketNumber)} · ${j.outcome==='cleared'?'Cleared':'Marked'} ${fday(j.t.completed)} by ${esc(j.assignedTechName||'')}</div>
+      <div class="facts"><div><b>${dl}</b><span>Days left</span></div><div><b>${fday(j.validUntil)}</b><span>Expires</span></div><div><b>${fday(j.t.completed + 180*DAY)}</b><span>180-day limit</span></div></div>
+      ${st ? `<div class="note ok"><b>Continuation statement received.</b> The excavator confirmed conditions haven't changed, so they can keep digging on this locate up to the 180-day limit.</div>`
+           : `<div class="note warn">${dl<=15 && dl>=10 ? '<b>The continuation window is open.</b> The excavator must send their statement to Ontario One Call now, 10 to 15 days before expiry.' : dl<10 ? '<b>Too late for a continuation.</b> Expect a new locate request.' : `<b>Continuation window opens in ${dl-15} days.</b>`}</div>`}
+      <div class="btns"><button class="btn alt" data-act="expRemind">Remind the excavator</button><button class="btn" data-act="closeSheet" data-arg="exp">Done</button></div>
+      <div class="sec" style="font-size:15px">History</div>${hist(j)}`); },
+  expRemind(){ toast('Reminder sent with a link to the continuation-to-dig form.'); },
+  dlView(){ sheet('dlp', `<b style="font-size:18px">Eglinton West fibre build</b><div class="muted">Dedicated Locator project DL-2026-0417 · GreenFlag Locates</div>
+      <div class="prog"><i style="width:64%"></i></div><div class="muted" style="font-size:13.5px">9 of 14 tickets complete · every ticket due 10 business days after notice</div>
+      <div class="list">${[['Segment A · Islington to Kipling','Complete'],['Segment B · Kipling to Royal York','Complete'],['Segment C · Royal York to Scarlett','In progress'],['Segment D · Scarlett to Jane','Scheduled'],['Segment E · Jane to Keele','Not started']].map(([a,b])=>`<button tabindex="-1"><div style="flex:1"><b>${a}</b><span>${b}</span></div></button>`).join('')}</div>
+      <div class="note info">On a Dedicated Locator project, one locate company marks every utility for the whole project, so these tickets don't go to the open pool.</div>`); },
+  rejectOpen(){ sheet('rej', `<b style="font-size:18px">Why are you rejecting this request?</b>
+      <div class="qr" style="margin-top:10px">${['Outside our territory','Dig area unclear','Duplicate ticket'].map(q=>`<button data-act="rejQuick" data-arg="${q}">${q}</button>`).join('')}</div>
+      <textarea id="rejtxt" rows="3" placeholder="For example: dig area does not match the white paint on site"></textarea>
+      <div class="btns" style="margin-top:12px"><button class="btn alt" data-act="closeSheet" data-arg="rej">Cancel</button><button class="btn" style="background:var(--red)" data-act="reject">Reject request</button></div>`); },
+  rejQuick(t){ $('#rejtxt').value = t; },
+  closeSheet(id){ const s = document.getElementById(id); if (s) s.remove(); },
+  reject(){ const t = $('#rejtxt').value.trim(); if (t.length < 5){ toast('Write a short reason first.'); return; } const j = job(S.jobId); j.status = 'rejected'; sync(j, 'Rejected: ' + t); ACT.closeSheet('rej'); go('uDash'); toast('Rejected. The excavator is told why.'); },
+  track(id){ S.jobId = id; go('uTrack'); },
+  shareTrack(){ toast('In the real app this texts the excavator a live tracking link that expires when the technician arrives.', 3600); },
+  rate(id){ S.jobId = id; S.rating = 0; S.comment = ''; go('uRate'); },
+  docView(){ go('tDoc'); },
+  star(n){ S.rating = +n; const c = $('#comment'); if (c) S.comment = c.value; render(); },
+  decide(kind){ const j = job(S.jobId);
+    if (!S.rating){ toast('Pick a star rating first.'); return; }
+    if (kind==='flag' && !S.comment.trim()){ toast('Add a comment so the locate company knows what to fix.'); return; }
+    const ok = kind==='approve' && S.rating>=3; j.status = ok ? 'uio_approved' : 'disputed'; sync(j, ok ? `Approved by reviewer, ${S.rating}★` : `Flagged by reviewer, ${S.rating}★: ${S.comment}`);
+    go('uDash'); toast(ok ? 'Technician approved. Job closed.' : 'Flagged. The locate company has been told.'); },
+  officeOpen(){ S.office.open = true; renderOffice(); },
+  officeClose(){ S.office.open = false; renderOffice(); },
+  officeRow(id){ const j = job(id); S.office.open = false; renderOffice(); S.role = 'uio'; S.jobId = id;
+    const scr = j.status==='uio_review' ? 'uReview' : j.status==='completed_pending_review' ? 'uRate' : ['en_route','on_site','accepted'].includes(j.status) ? 'uTrack' : null;
+    if (scr) go(scr); else { go('uDash'); if (j.validUntil) ACT.expView(id); } },
+  officeCsv(){ const rows = officeRows(); const head = ['Ticket','Type','Status','Address','City','Due','Technician','Valid until'];
+    const csv = [head, ...rows.map(j => [j.ticketNumber, j.ticketType, (STATUS[j.status]||[j.status])[0], j.address, j.city, fdate(j.dueBy), j.assignedTechName||'', j.validUntil?fday(j.validUntil):''])].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    navigator.clipboard.writeText(csv).then(() => toastOffice(`Copied ${rows.length} rows as CSV. Paste into Excel or Google Sheets.`), () => toastOffice('Copy was blocked by the browser.')); },
+  fbOpen(){ openFeedback(); },
+  fbSave(){ saveFeedback(); },
+  fbCopy(){ copyFeedback(); }
+};
+
+/* ---------- office dashboard (desktop) ---------- */
+function officeRows(){
+  const o = S.office, q = o.q.toLowerCase();
+  const groups = {Open:['uio_review','approved_active','scheduled','accepted','en_route','on_site'], 'Awaiting review':['completed_pending_review'], Closed:['uio_approved','cleared','rejected','disputed'], All:null};
+  return jobs.filter(j => STATUS[j.status] && (o.type==='All' || j.ticketType===o.type) && (!groups[o.status] || groups[o.status].includes(j.status))
+    && (!q || [j.ticketNumber, j.address, j.city, j.assignedTechName||'', j.requesterCompany].join(' ').toLowerCase().includes(q)))
+    .sort((a,b) => new Date(a.dueBy) - new Date(b.dueBy));
+}
+function toastOffice(m){ const el = $('#office .otoast'); if (el){ el.textContent = m; el.style.display = 'block'; later(() => el.style.display = 'none', 3000); } }
+function renderOffice(){
+  let el = $('#office');
+  if (!S.office.open){ if (el) el.remove(); return; }
+  if (!el){ el = document.createElement('div'); el.id = 'office'; el.className = 'office'; document.body.appendChild(el);
+    el.addEventListener('click', e => { const t = e.target.closest('[data-act]'); if (t && ACT[t.dataset.act]){ e.stopPropagation(); ACT[t.dataset.act](t.dataset.arg); } });
+    el.addEventListener('input', e => { if (e.target.dataset.of){ S.office[e.target.dataset.of] = e.target.value; renderOffice(); } }); }
+  const open = jobs.filter(j => ['uio_review','approved_active','scheduled','accepted','en_route','on_site'].includes(j.status));
+  const due = open.filter(j => new Date(j.dueBy)-Date.now() < DAY).length, exp = jobs.filter(j => j.validUntil && daysLeft(j)<=20 && daysLeft(j)>0).length;
+  const rows = officeRows(), o = S.office, foc = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.of : null;
+  el.innerHTML = `<header><h2>LocateGo office · Enbridge Gas, Toronto region</h2><span style="font-size:13px;opacity:.8">Synced with 360 Feedback ${Math.max(1, Math.round((Date.now()-S.synced)/6e4))} min ago</span><button data-act="officeCsv">Copy as CSV</button><button data-act="officeClose">Close</button></header>
+  <div class="wrap">
+    <div class="kpis"><div><b>${open.length}</b><span>Open tickets</span></div><div><b style="color:${due?'#D42B2B':'inherit'}">${due}</b><span>Due in 24 h</span></div><div><b>0</b><span>Overdue</span></div><div><b>94%</b><span>On time this month</span></div><div><b>${jobs.filter(j=>j.delay&&j.delay.state==='pending').length}</b><span>Delay notices</span></div><div><b>${exp}</b><span>Expiring in 20 days</span></div></div>
+    <div class="otools">
+      <select data-of="status" aria-label="Status">${['Open','Awaiting review','Closed','All'].map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select>
+      <select data-of="type" aria-label="Ticket type">${['All','Emergency','Priority','Standard','Remark','Design and Planning','Large project (ALR)'].map(s=>`<option ${o.type===s?'selected':''}>${s}</option>`).join('')}</select>
+      <input data-of="q" placeholder="Search ticket, address, technician" value="${esc(o.q)}" style="min-width:260px">
+      <span style="color:#5B6675;font-size:13.5px">${rows.length} tickets · click a row to open it</span>
+    </div>
+    <div class="owrapt"><table class="otable"><thead><tr><th>Ticket</th><th>Type</th><th>Status</th><th>Address</th><th>City</th><th>Due</th><th>Technician</th><th>Utilities</th><th>Valid until</th></tr></thead>
+      <tbody>${rows.map(j=>`<tr data-act="officeRow" data-arg="${j.id}"><td class="num"><b>${esc(j.ticketNumber)}</b></td><td>${tchip(j.ticketType)}</td><td>${badge(j.status)}${j.delay&&j.delay.state==='pending'?' <span class="badge" style="background:#F29900">Delay</span>':''}</td><td>${esc(j.address)}</td><td>${esc(j.city)}</td><td class="num" style="color:${new Date(j.dueBy)-Date.now()<DAY&&open.includes(j)?'#D42B2B':'inherit'}">${fdate(j.dueBy)}</td><td>${esc(j.assignedTechName||'–')}</td><td>${j.utilityTypes.map(u=>`<i title="${u}" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${UTIL[u]};margin-right:3px"></i>`).join('')}</td><td class="num">${j.validUntil?fday(j.validUntil):''}</td></tr>`).join('')}</tbody></table></div>
+    <div class="otoast" style="display:none;position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0F1B2D;color:#fff;padding:12px 16px;border-radius:10px"></div>
+  </div>`;
+  if (foc){ const f = el.querySelector(`[data-of="${foc}"]`); if (f){ f.focus(); if (f.setSelectionRange) f.setSelectionRange(f.value.length, f.value.length); } }
+}
+
+/* ---------- feedback ---------- */
+const SCREEN_NAMES = {start:'Start',tHome:'Technician home map',tActive:'Active job',tNav:'Navigation',tComplete:'Completion form',tSketch:'Locate sketch',tDoc:'Locate document',tSummary:'Job summary',tJobs:'My work',uDash:'Reviewer dashboard',uReview:'Ticket review',uTrack:'Live tracking',uRate:'Rate completed locate'};
+let db = null, me = null;
+function openFeedback(){
+  const where = S.office.open ? 'Office dashboard' : (SCREEN_NAMES[S.screen]||S.screen);
+  if (S.office.open){ S.office.open = false; renderOffice(); }
+  sheet('fb', `<b style="font-size:18px">Feedback on: ${esc(where)}</b>
+    <p class="muted" style="margin:4px 0 10px;font-size:14px">What's confusing, missing, or would stop you using this on a real job?</p>
+    <input type="text" id="fbname" placeholder="Your name and role (e.g. Sam, locator)" value="${esc(S.fbName)}">
+    <textarea id="fbtxt" rows="4" style="margin-top:8px" placeholder="Type here"></textarea>
+    <div class="btns" style="margin-top:10px"><button class="btn alt" data-act="closeSheet" data-arg="fb">Close</button><button class="btn w3" data-act="fbSave" data-arg="${esc(where)}">Save note</button></div>
+    ${S.feedback.length?`<div style="margin-top:16px"><div style="display:flex;justify-content:space-between;align-items:center"><b>Your notes (${S.feedback.length})</b><button class="chipbtn" style="min-height:38px;color:var(--n);border-color:#CBD2DB" data-act="fbCopy">Copy all</button></div>
+      ${S.feedback.slice().reverse().map(f=>`<div class="fbitem"><small>${esc(f.screen)}</small>${esc(f.text)}</div>`).join('')}</div>`:''}
+    <p class="small" style="margin:12px 0 0">${db?'Notes are sent to the LocateGo team automatically.':'Tap “Copy all” when you’re done and paste your notes into a text or email to the person who sent you this link.'}</p>`);
+  $('#fbtxt').focus();
+}
+async function saveFeedback(){
+  const text = $('#fbtxt').value.trim(), name = $('#fbname').value.trim();
+  if (!text){ toast('Type a note first.'); return; }
+  S.fbName = name;
+  const note = {screen: SCREEN_NAMES[S.screen]||S.screen, role: S.role||'none', name, text, at: new Date().toISOString()};
+  S.feedback.push(note);
+  let sent = false;
+  if (db && me){
+    try { const ref = db.doc('feedback/'+me); const snap = await ref.get().catch(()=>null);
+      const prev = snap && (typeof snap.data === 'function' ? snap.data() : snap.data) || {};
+      await ref.set({notes: [...(prev.notes||[]), note], updatedAt: note.at}); sent = true; } catch(e) { sent = false; }
+  }
+  openFeedback();
+  toast(sent ? 'Thanks. Your note was sent.' : 'Thanks. Note saved on this page. Use Copy all to send it.');
+}
+async function copyFeedback(){
+  const txt = S.feedback.map(f=>`[${f.screen}] ${f.text}`).join('\n') + (S.fbName ? `\n- ${S.fbName}` : '');
+  try { await navigator.clipboard.writeText(txt); toast('Copied. Paste it into a text or email.'); }
+  catch(e){ const t = $('#fbtxt'); t.value = txt; t.select(); toast('Select and copy the text in the box.'); }
+}
+
+app.closest('.stage').addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const act = el.dataset.act; if (!act) return;
+  if (act.startsWith('go:')) return go(act.slice(3));
+  if (ACT[act]) ACT[act](el.dataset.arg);
+});
+window.addEventListener('resize', () => drawMaps());
+
+reset();
+(async () => {
+  try {
+    if (!window.claude || !window.claude.use) return;
+    const [d, u] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    if (d && u && typeof u.id === 'function'){ db = d; me = await u.id(); }
+  } catch(e) { db = null; }
+})();
+}
+
+})();
+</script>
+</body>
+</html>
